@@ -3,7 +3,7 @@ import { Fallacy } from './types';
 // Simple heuristic fallback for fully offline mode
 const rules_fa = [
   {
-    regex: /(همه|هیچکس|همیشه|هرگز||همه‌چیز|هیچ‌چیز)/g,
+    regex: /(همه|هیچکس|همیشه|هرگز|همه‌چیز|هیچ‌چیز)/g,
     errorName: "تعمیم شتاب‌زده (Hasty Generalization)",
     explanation: "استفاده از کلمات مطلق معمولاً نشان‌دهنده یک پیش‌فرض قاطع و بدون استثنا است که در منطق مخدوش است."
   },

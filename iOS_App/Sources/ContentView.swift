@@ -1,5 +1,11 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+typealias PlatformImage = NSImage
+#else
 import UIKit
+typealias PlatformImage = UIImage
+#endif
 
 // MARK: - Models
 struct FallacyItem: Codable, Identifiable, Hashable {
@@ -388,6 +394,24 @@ struct ExamPaperView: View {
 }
 
 // MARK: - Sharing Activity View Component
+#if os(macOS)
+struct ShareSheetView: NSViewRepresentable {
+    var items: [Any]
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let firstItem = items.first {
+                let picker = NSSharingServicePicker(items: [firstItem])
+                if let window = view.window {
+                    picker.show(relativeTo: .zero, of: window.contentView ?? view, preferredEdge: .minY)
+                }
+            }
+        }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+#else
 struct ShareSheetView: UIViewControllerRepresentable {
     var items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
@@ -395,6 +419,7 @@ struct ShareSheetView: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 
 // MARK: - Main Application Root
 struct ContentView: View {
@@ -473,13 +498,21 @@ struct ContentView: View {
         let subject = currentStrings.emailSubject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let body = currentStrings.emailBody.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         if let url = URL(string: "mailto:Sobhan.Ganji@Yahoo.Com?subject=\(subject)&body=\(body)") {
+            #if os(macOS)
+            NSWorkspace.shared.open(url)
+            #else
             UIApplication.shared.open(url)
+            #endif
         }
     }
     
     private func openPaypal() {
         if let url = URL(string: "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=Sobhan.Ganji@iCloud.com&currency_code=USD&source=url") {
+            #if os(macOS)
+            NSWorkspace.shared.open(url)
+            #else
             UIApplication.shared.open(url)
+            #endif
         }
     }
 }
@@ -530,7 +563,7 @@ struct AnalyzeScreenView: View {
     @State private var errorMessage: String? = nil
     @State private var analysisResult: [FallacyItem]? = nil
     @State private var showShareSheet = false
-    @State private var shareImage: UIImage? = nil
+    @State private var shareImage: PlatformImage? = nil
     @State private var analysisDate = Date()
     
     var body: some View {
@@ -710,10 +743,17 @@ struct AnalyzeScreenView: View {
         let renderer = ImageRenderer(content: viewToRender)
         renderer.scale = 3.0 // High quality DPI for messages/emails
         
+        #if os(macOS)
+        if let nsImage = renderer.nsImage {
+            self.shareImage = nsImage
+            self.showShareSheet = true
+        }
+        #else
         if let uiImage = renderer.uiImage {
             self.shareImage = uiImage
             self.showShareSheet = true
         }
+        #endif
     }
 }
 
@@ -812,7 +852,7 @@ struct HistoryScreenView: View {
 struct HistoryDetailView: View {
     let item: HistoryItem
     @State private var showShareSheet = false
-    @State private var shareImage: UIImage? = nil
+    @State private var shareImage: PlatformImage? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -859,9 +899,16 @@ struct HistoryDetailView: View {
         let renderer = ImageRenderer(content: viewToRender)
         renderer.scale = 3.0
         
+        #if os(macOS)
+        if let nsImage = renderer.nsImage {
+            self.shareImage = nsImage
+            self.showShareSheet = true
+        }
+        #else
         if let uiImage = renderer.uiImage {
             self.shareImage = uiImage
             self.showShareSheet = true
         }
+        #endif
     }
 }

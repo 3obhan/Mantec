@@ -35,7 +35,7 @@ export const Analyze = () => {
       for (const path of paths) {
         try {
           console.log(`Attempting to fetch and resize seal from: ${path}`);
-          const res = await fetch(path);
+          const res = await fetch(path, { credentials: 'omit' });
           if (!res.ok) throw new Error(`HTTP error ${res.status}`);
           const blob = await res.blob();
           
@@ -99,6 +99,10 @@ export const Analyze = () => {
     preloadAndResizeSeal();
   }, []);
 
+  const getSafeUUID = () => {
+    return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+  };
+
   const handleAnalyze = async () => {
     if (!text.trim()) {
       setError(t.errorRequired);
@@ -113,7 +117,7 @@ export const Analyze = () => {
       const offlineResult = runOfflineAnalysis(text, lang as 'fa' | 'en');
       setResult(offlineResult);
       addHistory({
-        id: crypto.randomUUID(),
+        id: getSafeUUID(),
         timestamp: new Date().toISOString(),
         text,
         fallacies: offlineResult,
@@ -124,21 +128,43 @@ export const Analyze = () => {
     }
 
     try {
-      const response = await fetch('/api/analyze', {
+      const apiUrl = new URL('/api/analyze', window.location.origin).toString();
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, lang })
+        body: JSON.stringify({ text, lang }),
+        credentials: 'omit'
       });
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok) {
+        let errorMsg = `Server error (Status ${response.status})`;
+        if (contentType.includes('application/json')) {
+          try {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+          } catch (_) {}
+        } else {
+          try {
+            const textData = await response.text();
+            if (textData && textData.length < 150) {
+              errorMsg = textData;
+            }
+          } catch (_) {}
+        }
+        throw new Error(errorMsg);
+      }
+      
+      if (!contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server. Expected JSON, but received HTML or plain text. Please verify that your backend or Cloudflare Pages Function is deployed and running.');
+      }
       
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || "Server Error");
-      }
-
       setResult(data.analysis);
       addHistory({
-        id: crypto.randomUUID(),
+        id: getSafeUUID(),
         timestamp: new Date().toISOString(),
         text,
         fallacies: data.analysis,
@@ -146,7 +172,28 @@ export const Analyze = () => {
       });
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to analyze");
+      const errMsg = err.message || "Failed to analyze";
+      
+      // Check for known Safari/WebKit fetch/cookie pattern bugs or generic failures to enable a smooth UX fallback
+      const isPatternError = errMsg.includes("The string did not match the expected pattern") || 
+                             errMsg.includes("did not match the expected pattern");
+                             
+      if (isPatternError) {
+        console.log("Safari fetch pattern mismatch detected. Safely falling back to local offline logic.");
+        const offlineResult = runOfflineAnalysis(text, lang as 'fa' | 'en');
+        setResult(offlineResult);
+        addHistory({
+          id: getSafeUUID(),
+          timestamp: new Date().toISOString(),
+          text,
+          fallacies: offlineResult,
+          lang: lang as 'fa'|'en'
+        });
+        setIsOffline(true);
+        setError("سیستم به دلیل محدودیت فنی مرورگر، به طور خودکار به بخش تحلیلگر آفلاین متصل شد تا نتیجه را نمایش دهد.");
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }
