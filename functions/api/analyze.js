@@ -40,25 +40,44 @@ Here is the user text to evaluate:
 "${text}"
     `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    const geminiResponse = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
-        }
-      })
-    });
+    const models = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+    let geminiResponse = null;
+    let lastError = null;
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      return new Response(JSON.stringify({ error: `Gemini API Error: ${errorText}` }), {
-        status: geminiResponse.status,
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        if (response.ok) {
+          geminiResponse = response;
+          break;
+        } else {
+          const errText = await response.text();
+          lastError = `Model ${model} failed with status ${response.status}: ${errText}`;
+          console.warn(lastError);
+        }
+      } catch (e) {
+        lastError = `Model ${model} threw error: ${e.message}`;
+        console.warn(lastError);
+      }
+    }
+
+    if (!geminiResponse) {
+      return new Response(JSON.stringify({ error: `Gemini API Error: All models are currently under heavy load or unavailable. Please try again in a few moments. (Details: ${lastError})` }), {
+        status: 503,
         headers: { "Content-Type": "application/json" }
       });
     }

@@ -46,16 +46,35 @@ Here is the user text to evaluate:
 "${text}"
       `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: {
-          temperature: 0.2, // Low temperature for high logical consistency
-          responseMimeType: "application/json",
-        }
-      });
+      const models = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+      let apiResponse = null;
+      let lastError = null;
 
-      const resultText = response.text || "[]";
+      for (const model of models) {
+        try {
+          const response = await ai.models.generateContent({
+            model: model,
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              temperature: 0.2, // Low temperature for high logical consistency
+              responseMimeType: "application/json",
+            }
+          });
+          if (response && response.text) {
+            apiResponse = response;
+            break;
+          }
+        } catch (e: any) {
+          lastError = `Model ${model} failed: ${e.message}`;
+          console.warn(lastError);
+        }
+      }
+
+      if (!apiResponse) {
+        throw new Error(`All models failed or returned empty results. Last error: ${lastError}`);
+      }
+
+      const resultText = apiResponse.text || "[]";
       let parsed = [];
       try {
         parsed = JSON.parse(resultText);
