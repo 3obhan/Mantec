@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppState } from '../store';
 import { translations } from '../i18n';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Download, ServerCrash } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, ServerCrash, HelpCircle } from 'lucide-react';
 import { runOfflineAnalysis } from '../offlineAnalyzer';
 import { Fallacy } from '../types';
 import jsPDF from 'jspdf';
@@ -23,6 +23,106 @@ export const Analyze = () => {
 
   const printRef = useRef<HTMLDivElement>(null);
 
+  const generateFallbackSeal = (): string => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 300;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return '';
+
+      // Clear background to transparent
+      ctx.clearRect(0, 0, 300, 300);
+
+      const cx = 150;
+      const cy = 150;
+      const color = 'rgba(220, 38, 38, 0.85)'; // Classic red stamp ink with slight transparency
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      
+      // Draw outer circle
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 130, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Draw inner thin circle
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 120, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Draw middle circle
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 80, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Draw inner core circle
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 72, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Add stamp ink texture noise
+      ctx.fillStyle = color;
+      for (let i = 0; i < 350; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 60 + Math.random() * 80;
+        const px = cx + Math.cos(angle) * radius;
+        const py = cy + Math.sin(angle) * radius;
+        ctx.fillRect(px, py, 1 + Math.random() * 1.5, 1 + Math.random() * 1.5);
+      }
+
+      // Center text
+      ctx.font = 'bold 24px "Vazirmatn", "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('منطک', cx, cy - 10);
+      
+      ctx.font = 'bold 13px "Vazirmatn", "Inter", sans-serif';
+      ctx.fillText('تأیید شد', cx, cy + 18);
+
+      // Helper to draw text along arc
+      const drawTextAlongArc = (
+        text: string,
+        radius: number,
+        startAngle: number,
+        endAngle: number
+      ) => {
+        const chars = text.split('');
+        const totalAngle = endAngle - startAngle;
+        const step = totalAngle / (chars.length - 1 || 1);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.font = 'bold 10px "Vazirmatn", "Inter", sans-serif';
+        
+        chars.forEach((char, index) => {
+          const angle = startAngle + step * index;
+          ctx.save();
+          ctx.rotate(angle);
+          ctx.translate(0, -radius);
+          ctx.fillText(char, 0, 0);
+          ctx.restore();
+        });
+        ctx.restore();
+      };
+
+      // Draw top Persian text (arcing over the top)
+      drawTextAlongArc('مهر ارزیابی عقل محض و سنجش مغالطات', 100, -Math.PI * 0.8, -Math.PI * 0.2);
+
+      // Draw bottom English/Bilingual text (arcing under the bottom)
+      drawTextAlongArc('★ MANTAK LOGIC REASONING DEPARTMENT ★', 100, Math.PI * 0.2, Math.PI * 0.8);
+
+      return canvas.toDataURL('image/png');
+    } catch (e) {
+      console.error('Failed to procedurally generate fallback seal:', e);
+      return '';
+    }
+  };
+
   useEffect(() => {
     const preloadAndResizeSeal = async () => {
       const paths = [
@@ -35,7 +135,7 @@ export const Analyze = () => {
       for (const path of paths) {
         try {
           console.log(`Attempting to fetch and resize seal from: ${path}`);
-          const res = await fetch(path, { credentials: 'omit' });
+          const res = await fetch(path, { credentials: 'include' });
           if (!res.ok) throw new Error(`HTTP error ${res.status}`);
           const blob = await res.blob();
           
@@ -93,7 +193,12 @@ export const Analyze = () => {
           console.warn(`Failed to load/resize seal from ${path}:`, err);
         }
       }
-      console.error('All seal image preload and resize attempts failed.');
+
+      console.log('Using beautiful procedurally generated seal fallback.');
+      const fallbackBase64 = generateFallbackSeal();
+      if (fallbackBase64) {
+        setStampSrc(fallbackBase64);
+      }
     };
 
     preloadAndResizeSeal();
@@ -133,7 +238,7 @@ export const Analyze = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, lang }),
-        credentials: 'omit'
+        credentials: 'include'
       });
       
       const contentType = response.headers.get('content-type') || '';
@@ -271,7 +376,7 @@ export const Analyze = () => {
       <button
         onClick={handleAnalyze}
         disabled={loading}
-        className="px-8 py-3.5 sm:px-10 sm:py-4 bg-[#1A1A1A] text-white text-lg sm:text-xl border-4 border-[#1A1A1A] font-black uppercase tracking-widest hover:bg-white hover:text-[#1A1A1A] disabled:opacity-50 disabled:hover:bg-[#1A1A1A] disabled:hover:text-white transition-colors w-full sm:w-auto shadow-[6px_6px_0px_0px_rgba(26,26,26,1)] sm:shadow-[8px_8px_0px_0px_rgba(26,26,26,1)] hover:shadow-none hover:translate-x-1.5 hover:translate-y-1.5 focus:outline-none"
+        className="px-8 py-3.5 sm:px-10 sm:py-4 bg-[#1A1A1A] text-white text-lg sm:text-xl border-4 border-[#1A1A1A] font-black uppercase tracking-widest hover:bg-white hover:text-[#1A1A1A] disabled:opacity-50 disabled:hover:bg-[#1A1A1A] disabled:hover:text-white transition-colors w-full sm:w-auto shadow-[6px_6px_0px_0px_rgba(26,26,26,1)] sm:shadow-[8px_8px_0px_0px_rgba(26,26,26,1)] hover:shadow-none hover:translate-x-1.5 hover:translate-y-1.5 focus:outline-none animate-fade-in"
       >
         {loading ? t.analyzing : t.analyzeBtn}
       </button>
