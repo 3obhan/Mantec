@@ -1,17 +1,25 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+<img width="1200" height="475" alt="GHBanner" src="https://cdn.phototourl.com/free/2026-07-08-e0cda2da-58f3-4776-91f6-5980bb604119.png" />
 </div>
 
-# Run and deploy your AI Studio app
+Mantec | منطک
 
-This contains everything you need to run your app locally.
+English | فارسی
 
-View your app in AI Studio: https://ai.studio/apps/dbad9a57-d2b1-4e6b-8da5-cb579d34832e
+Logical Analyzer Tool | ابزار سنجش منطق
 
-## Run Locally
+منطک که دستیار هوشمند شماست در خردورزی‌های ان‌شاء‌الله پیاپی پیش رو، بنا دارد اگر طبیعتی نکرده اشتباهی چیزی داشت متن شما بگوید به شما و بگوید چرا و کجا و چطورش را.
+باشد که همگی‌مان کمتر گه بخوریم.
 
-**Prerequisites:**  Node.js
+هدف پروژهٔ منطک اهتمام به داشتن دنیایی‌ست عاقلانه‌تر، اخلاق‌مدارانه‌تر و بالطبع زیباتر... | سبحان گنجی
 
+برنامه به صورت رایگان در بستر کلاودفلر و گیتهاب با آدرس‌هایی که ذیلا می‌آید در دسترس می‌باشد:
+
+https://Mantec.Pages.dev
+
+https://3obhan.github.io/Mantec
+
+برای اجرای توسعه‌‌مندتر منطک هم می‌توانید:
 
 1. Install dependencies:
    `npm install`
