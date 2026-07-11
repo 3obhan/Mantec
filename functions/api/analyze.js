@@ -1,35 +1,12 @@
-// Sanitizes the input text by stripping out any data URIs, base64 strings, or large binary chunks
-function sanitizeInput(text) {
-  if (!text || typeof text !== 'string') return '';
-  
-  // 1. Remove data URIs (e.g., data:image/png;base64,...)
-  let cleaned = text.replace(/data:[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+;base64,[a-zA-Z0-9+/=]+/gi, '[Base64/Binary Data Removed]');
-  
-  // 2. Remove raw long base64/hex blocks (e.g., 40+ characters of uninterrupted alphanumeric/plus/slash/equal characters)
-  cleaned = cleaned.replace(/\b[a-zA-Z0-9+/]{40,}=*\b/g, '[Base64/Binary Data Removed]');
-  
-  return cleaned.trim();
-}
-
 export async function onRequestPost(context) {
   try {
     const { request, env } = context;
-    const body = await request.json();
-    const { lang } = body;
-    let { text } = body;
+    const { text, lang } = await request.json();
 
-    // Sanitize input text to remove base64, data URIs, and irrelevant binary clutter
-    text = sanitizeInput(text);
-
-    if (!text) {
-      return new Response(JSON.stringify({ error: "No text provided or text contained only invalid binary/base64 data" }), {
+    if (!text || typeof text !== 'string') {
+      return new Response(JSON.stringify({ error: "No text provided" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Methods": "POST, OPTIONS"
-        }
+        headers: { "Content-Type": "application/json" }
       });
     }
 
@@ -37,12 +14,7 @@ export async function onRequestPost(context) {
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "Server missing Gemini API Key. Please configure GEMINI_API_KEY in your Cloudflare Pages dashboard environment variables." }), {
         status: 500,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Methods": "POST, OPTIONS"
-        }
+        headers: { "Content-Type": "application/json" }
       });
     }
 
@@ -79,7 +51,7 @@ IMPORTANT INSTRUCTIONS:
 
 Each object must contain exactly:
 1. "quote": The exact flawed segment or sentence from the text.
-2. "errorName": The exact type or name of the logical fallacy/error (in ${isPersian ? 'Persian' : 'English'}).
+2. "errorName": The exact type or name of the logical fallacy/error (in ${isPersian ? 'Persian' : 'English'}). For example, "خطای دسته‌بندی" (Category Mistake) or "مغالطه پهلوان‌پنبه" (Strawman Fallacy).
 3. "explanation": A clear, educational, and elegant rational explanation of why it is logically/conceptually flawed (in ${isPersian ? 'Persian' : 'English'}). Make this explanation friendly, highly educational, analytical, and easy to read.
 
 Here is the user text to evaluate:
@@ -123,7 +95,7 @@ Here is the user text to evaluate:
     }
 
     if (!geminiResponse) {
-      return new Response(JSON.stringify({ error: `Gemini API Error: All models are currently under heavy load or unavailable. Please try again. (Details: ${lastError})` }), {
+      return new Response(JSON.stringify({ error: `Gemini API Error: All models are currently under heavy load or unavailable. Please try again in a few moments. (Details: ${lastError})` }), {
         status: 503,
         headers: { 
           "Content-Type": "application/json",
@@ -157,12 +129,7 @@ Here is the user text to evaluate:
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message || "An error occurred during analysis" }), {
       status: 500,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS"
-      }
+      headers: { "Content-Type": "application/json" }
     });
   }
 }
