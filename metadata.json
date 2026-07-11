@@ -1,0 +1,6 @@
+{
+  "name": "Mantec Logical Analyzer",
+  "description": "A logical analyzer using pure reasoning to detect logical fallacies and errors in both online and offline modes, providing outputs designed as graded exam papers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

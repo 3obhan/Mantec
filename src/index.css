@@ -1,0 +1,28 @@
+@font-face {
+  font-family: 'GeneralFont';
+  src: url('/general_font.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'RedPenFont';
+  src: url('/Red_Pen.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&family=Aref+Ruqaa:wght@400;700&family=Zeyada&family=Caveat:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Vazirmatn", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-cursive-fa: "GeneralFont", "RedPenFont", "Aref Ruqaa", cursive;
+  --font-cursive-en: "Caveat", "Zeyada", cursive;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #F4F4F2;
+  color: #1A1A1A;
+  margin: 0;
+  height: 100%;
+}

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Mantak (منطک)
+Comment=Advanced Logical Reasoner and Analyzer
+# اجرای اسکریپت در محیط ترمینال اکس‌اف‌سی‌ای (xfce4-terminal)
+Exec=bash -c '"$(dirname "%k")/run.sh"; read -p "Press any key to close..."'
+Icon=utilities-terminal
+Terminal=true
+Categories=Education;Utility;
