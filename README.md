@@ -17,8 +17,7 @@ Logical Analyzer Tool | ابزار سنجش منطق
 
 https://Mantec.Pages.dev
 
-https://3obhan.github.io/Mantec
-
+https://mantak-logical-analyzer-268162392915.us-east1.run.app
 برای اجرای توسعه‌‌مندتر منطک هم می‌توانید:
 
 1. Install dependencies:
