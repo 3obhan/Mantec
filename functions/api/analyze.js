@@ -58,51 +58,42 @@ Here is the user text to evaluate:
 "${text}"
     `;
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    const model = 'gemini-3.5-flash';
     let geminiResponse = null;
     let lastError = null;
 
-    for (const model of modelsToTry) {
-      try {
-        console.log(`[Cloudflare Function] Querying model: ${model}`);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: "application/json"
-            }
-          })
-        });
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json"
+          }
+        })
+      });
 
-        if (response.ok) {
-          geminiResponse = response;
-          break; // Stop trying if we have a successful response
-        } else {
-          const errText = await response.text();
-          lastError = `Model ${model} failed with status ${response.status}: ${errText}`;
-          console.warn(lastError);
-        }
-      } catch (e) {
-        lastError = `Model ${model} threw error: ${e.message}`;
+      if (response.ok) {
+        geminiResponse = response;
+      } else {
+        const errText = await response.text();
+        lastError = `Model ${model} failed with status ${response.status}: ${errText}`;
         console.warn(lastError);
       }
+    } catch (e) {
+      lastError = `Model ${model} threw error: ${e.message}`;
+      console.warn(lastError);
     }
 
     if (!geminiResponse) {
       return new Response(JSON.stringify({ error: `Gemini API Error: All models are currently under heavy load or unavailable. Please try again in a few moments. (Details: ${lastError})` }), {
         status: 503,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Methods": "POST, OPTIONS"
-        }
+        headers: { "Content-Type": "application/json" }
       });
     }
 
