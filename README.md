@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://cdn.phototourl.com/free/2026-07-08-e0cda2da-58f3-4776-91f6-5980bb604119.png" />
+<img width="1200" height="475" alt="GHBanner" src="https://cdn.phototourl.com/free/2026-07-15-ba34036c-b4c2-4b83-8e51-1e84f443356a.jpg" />
 </div>
 
 Mantec | منطک
