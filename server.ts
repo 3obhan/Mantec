@@ -1,10 +1,62 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { runOfflineAnalysis } from "./src/offlineAnalyzer";
 
 dotenv.config();
+
+// File-based persistent cache to avoid duplicate API calls for identical texts
+const CACHE_FILE = path.join(process.cwd(), "analysis_cache.json");
+let analysisCache: Record<string, any> = {};
+
+try {
+  if (fs.existsSync(CACHE_FILE)) {
+    analysisCache = JSON.parse(fs.readFileSync(CACHE_FILE, "utf-8"));
+    console.log(`[Cache] Loaded ${Object.keys(analysisCache).length} cached analyses.`);
+  }
+} catch (err) {
+  console.error("[Cache] Failed to load cache file:", err);
+}
+
+function saveCache() {
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(analysisCache, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Cache] Failed to save cache file:", err);
+  }
+}
+
+// Helper to normalize text for caching to ensure identical inputs match even with minor formatting/punctuation/character differences
+function normalizeTextForCache(text: string): string {
+  if (!text) return "";
+  let norm = text.trim().toLowerCase();
+  // Standardize multiple spacing/newlines
+  norm = norm.replace(/[\s\r\n\t]+/g, " ");
+  // Standardize common Farsi/Arabic letter variations
+  norm = norm.replace(/ي/g, "ی");
+  norm = norm.replace(/ك/g, "ک");
+  // Strip common punctuations to make matching highly resilient to small edits/marks
+  norm = norm.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()؟?؛،]/g, "");
+  // Standardize spacing again after punctuation stripping
+  norm = norm.replace(/\s+/g, " ");
+  return norm.trim();
+}
+
+// Sanitizes the input text by stripping out any data URIs, base64 strings, or large binary chunks
+function sanitizeInput(text: string): string {
+  if (!text) return "";
+  
+  // 1. Remove data URIs (e.g., data:image/png;base64,...)
+  let cleaned = text.replace(/data:[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+;base64,[a-zA-Z0-9+/=]+/gi, '[Base64/Binary Data Removed]');
+  
+  // 2. Remove raw long base64/hex blocks (e.g., 40+ characters of uninterrupted alphanumeric/plus/slash/equal characters)
+  cleaned = cleaned.replace(/\b[a-zA-Z0-9+/]{40,}=*\b/g, '[Base64/Binary Data Removed]');
+  
+  return cleaned.trim();
+}
 
 let aiClient: GoogleGenAI | null = null;
 function getAI() {
@@ -13,9 +65,75 @@ function getAI() {
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY environment variable is required");
     }
-    aiClient = new GoogleGenAI({ apiKey });
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
   return aiClient;
+}
+
+// Helper to call a specific Gemini model with deterministic configuration
+async function callGemini(modelName: string, prompt: string): Promise<string> {
+  const ai = getAI();
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      temperature: 0.0, // Set to 0.0 for absolute logical consistency and determinism
+      seed: 42,         // Stable seed to guarantee identical outputs for constant inputs
+      responseMimeType: "application/json",
+    }
+  });
+  
+  if (!response || !response.text) {
+    throw new Error("Empty response received from Gemini API");
+  }
+  return response.text;
+}
+
+// Resilient analyzer with retries and automatic lite fallback
+async function analyzeWithFallback(prompt: string, fallbackLang: 'fa' | 'en', originalText: string): Promise<any[]> {
+  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+  const maxRetriesPerModel = 2;
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    for (let attempt = 1; attempt <= maxRetriesPerModel; attempt++) {
+      try {
+        console.log(`[Gemini API] Querying ${model} (attempt ${attempt}/${maxRetriesPerModel})...`);
+        const responseText = await callGemini(model, prompt);
+        
+        let parsed = JSON.parse(responseText.trim());
+        if (Array.isArray(parsed)) {
+          return parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.analysis)) return parsed.analysis;
+          if (Array.isArray(parsed.fallacies)) return parsed.fallacies;
+        }
+        throw new Error("Response JSON structure is not an array");
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Gemini API] Attempt failed for model ${model}:`, err.message || err);
+        
+        // If it's a 503, 429, or other transient error, wait briefly before retrying
+        if (attempt < maxRetriesPerModel) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+      }
+    }
+  }
+
+  // No offline fallback! Throw error as requested by the user.
+  const isFa = fallbackLang === 'fa';
+  const displayError = isFa
+    ? `خطای سیستم هوش مصنوعی: تمامی مدل‌های آنلاین در حال حاضر با محدودیت سهمیه یا ترافیک سنگین مواجه هستند. لطفاً مجدداً تلاش کنید. (جزئیات: ${lastError?.message || lastError})`
+    : `AI System Error: All online models are currently under heavy load or quota limits. Please try again in a few moments. (Details: ${lastError?.message || lastError})`;
+  throw new Error(displayError);
 }
 
 async function startServer() {
@@ -34,17 +152,31 @@ async function startServer() {
   app.post("/api/analyze", async (req, res) => {
     console.log("[Server Log] Hit /api/analyze with body:", req.body);
     try {
-      const { text, lang } = req.body;
+      const { lang } = req.body;
+      let { text } = req.body;
+      
+      text = sanitizeInput(text);
       
       if (!text || typeof text !== 'string') {
-        return res.status(400).json({ error: "No text provided" });
-      }
-
-      if (!process.env.GEMINI_API_KEY) {
-        return res.status(500).json({ error: "Server missing Gemini API Key. Please configure it in the UI." });
+        return res.status(400).json({ error: "No text provided or text contained only invalid binary/base64 data" });
       }
 
       const isPersian = lang === 'fa';
+      const normalizedText = normalizeTextForCache(text);
+      const cacheKey = `${lang || 'fa'}_${normalizedText}`;
+
+      // 1. Check persistent cache for instant, 100% identical and free results
+      if (analysisCache[cacheKey]) {
+        console.log(`[Cache Log] Match found for key [${cacheKey}]! Instantly returning cached output.`);
+        return res.json({ analysis: analysisCache[cacheKey] });
+      }
+
+      // If key is missing, check if we can fall back to offline directly or run online
+      if (!process.env.GEMINI_API_KEY) {
+        console.warn("[Server Log] GEMINI_API_KEY is missing. Using offline analyzer directly.");
+        const offlineResult = runOfflineAnalysis(text, isPersian ? 'fa' : 'en');
+        return res.json({ analysis: offlineResult });
+      }
 
       const prompt = `
 You are an exceptionally rigorous, academic-grade pure logic analyzer and logical fallacy expert ("منطق‌سنج").
@@ -84,44 +216,14 @@ Here is the user text to evaluate:
 "${text}"
       `;
 
-      const models = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-2.5-flash'];
-      let apiResponse = null;
-      let lastError = null;
+      // 2. Perform the analysis with rich fallback capability
+      const analysisResult = await analyzeWithFallback(prompt, isPersian ? 'fa' : 'en', text);
 
-      for (const model of models) {
-        try {
-          const response = await getAI().models.generateContent({
-            model: model,
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            config: {
-              temperature: 0.2, // Low temperature for high logical consistency
-              responseMimeType: "application/json",
-            }
-          });
-          if (response && response.text) {
-            apiResponse = response;
-            break;
-          }
-        } catch (e: any) {
-          lastError = `Model ${model} failed: ${e.message}`;
-          console.warn(lastError);
-        }
-      }
+      // 3. Store result in local cache for future identical queries
+      analysisCache[cacheKey] = analysisResult;
+      saveCache();
 
-      if (!apiResponse) {
-        throw new Error(`All models failed or returned empty results. Last error: ${lastError}`);
-      }
-
-      const resultText = apiResponse.text || "[]";
-      let parsed = [];
-      try {
-        parsed = JSON.parse(resultText);
-      } catch (e) {
-        // Fallback if parsing fails
-        parsed = [];
-      }
-
-      res.json({ analysis: parsed });
+      res.json({ analysis: analysisResult });
 
     } catch (error: any) {
       console.error("Analysis Error:", error);
