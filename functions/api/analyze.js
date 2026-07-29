@@ -58,7 +58,7 @@ Here is the user text to evaluate:
 "${text}"
     `;
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    const modelsToTry = ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
     let geminiResponse = null;
     let lastError = null;
 
