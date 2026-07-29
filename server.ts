@@ -98,7 +98,7 @@ async function callGemini(modelName: string, prompt: string): Promise<string> {
 
 // Resilient analyzer with retries and automatic lite fallback
 async function analyzeWithFallback(prompt: string, fallbackLang: 'fa' | 'en', originalText: string): Promise<any[]> {
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+  const modelsToTry = ["gemini-2.0-flash-lite"];
   const maxRetriesPerModel = 2;
   let lastError: any = null;
 
