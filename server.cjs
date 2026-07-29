@@ -206,7 +206,7 @@ async function callGemini(modelName, prompt) {
   return response.text;
 }
 async function analyzeWithFallback(prompt, fallbackLang, originalText) {
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+  const modelsToTry = ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
   const maxRetriesPerModel = 2;
   let lastError = null;
   for (const model of modelsToTry) {
