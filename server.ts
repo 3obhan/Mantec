@@ -1,171 +1,21 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { runOfflineAnalysis } from "./src/offlineAnalyzer";
 
 dotenv.config();
 
-// File-based persistent cache to avoid duplicate API calls for identical texts
-const CACHE_FILE = path.join(process.cwd(), "analysis_cache.json");
-const SERVER_KEY_FILE = path.join(process.cwd(), "server_key.txt");
-
-// Persistent global server-level API key for all incoming requests (Web, iOS, Android)
-let globalServerApiKey = process.env.GEMINI_API_KEY || '';
-
-try {
-  if (fs.existsSync(SERVER_KEY_FILE)) {
-    const savedKey = fs.readFileSync(SERVER_KEY_FILE, "utf-8").trim();
-    if (savedKey) {
-      globalServerApiKey = savedKey;
-      console.log("[Server Log] Loaded persistent global server API Key from server_key.txt");
+let aiClient: GoogleGenAI | null = null;
+function getAI() {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required");
     }
+    aiClient = new GoogleGenAI({ apiKey });
   }
-} catch (err) {
-  console.error("[Server Log] Failed to load server_key.txt:", err);
-}
-
-let analysisCache: Record<string, any> = {};
-
-try {
-  if (fs.existsSync(CACHE_FILE)) {
-    analysisCache = JSON.parse(fs.readFileSync(CACHE_FILE, "utf-8"));
-    console.log(`[Cache] Loaded ${Object.keys(analysisCache).length} cached analyses.`);
-  }
-} catch (err) {
-  console.error("[Cache] Failed to load cache file:", err);
-}
-
-function saveCache() {
-  try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(analysisCache, null, 2), "utf-8");
-  } catch (err) {
-    console.error("[Cache] Failed to save cache file:", err);
-  }
-}
-
-// Helper to normalize text for caching to ensure identical inputs match even with minor formatting/punctuation/character differences
-function normalizeTextForCache(text: string): string {
-  if (!text) return "";
-  let norm = text.trim().toLowerCase();
-  // Standardize multiple spacing/newlines
-  norm = norm.replace(/[\s\r\n\t]+/g, " ");
-  // Standardize common Farsi/Arabic letter variations
-  norm = norm.replace(/ي/g, "ی");
-  norm = norm.replace(/ك/g, "ک");
-  // Strip common punctuations to make matching highly resilient to small edits/marks
-  norm = norm.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()؟?؛،]/g, "");
-  // Standardize spacing again after punctuation stripping
-  norm = norm.replace(/\s+/g, " ");
-  return norm.trim();
-}
-
-// Sanitizes the input text by stripping out any data URIs, base64 strings, or large binary chunks
-function sanitizeInput(text: string): string {
-  if (!text) return "";
-  
-  // 1. Remove data URIs (e.g., data:image/png;base64,...)
-  let cleaned = text.replace(/data:[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+;base64,[a-zA-Z0-9+/=]+/gi, '[Base64/Binary Data Removed]');
-  
-  // 2. Remove raw long base64/hex blocks (e.g., 40+ characters of uninterrupted alphanumeric/plus/slash/equal characters)
-  cleaned = cleaned.replace(/\b[a-zA-Z0-9+/]{40,}=*\b/g, '[Base64/Binary Data Removed]');
-  
-  return cleaned.trim();
-}
-
-function getAI(customApiKey?: string) {
-  const apiKey = customApiKey || globalServerApiKey || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is missing. Please provide a valid Gemini API Key.");
-  }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
-  });
-}
-
-// Helper to call a specific Gemini model with deterministic configuration
-async function callGemini(modelName: string, prompt: string, customApiKey?: string): Promise<string> {
-  const ai = getAI(customApiKey);
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      temperature: 0.1,
-      responseMimeType: "application/json",
-    }
-  });
-  
-  if (!response || !response.text) {
-    throw new Error("Empty response received from Gemini API");
-  }
-  return response.text;
-}
-
-// Resilient analyzer with retries across models and seamless rule-based fallback for unlimited usage
-async function analyzeWithFallback(prompt: string, fallbackLang: 'fa' | 'en', originalText: string, customApiKey?: string): Promise<{ data: any[]; fromAI: boolean }> {
-  const modelsToTry = [
-    "gemini-2.5-pro",
-    "gemini-2.0-flash",
-    "gemini-1.5-pro"
-  ];
-  const maxRetriesPerModel = 1;
-  let lastError: any = null;
-
-  for (const model of modelsToTry) {
-    for (let attempt = 1; attempt <= maxRetriesPerModel; attempt++) {
-      try {
-        console.log(`[Gemini API] Querying ${model} (attempt ${attempt}/${maxRetriesPerModel})...`);
-        const responseText = await callGemini(model, prompt, customApiKey);
-        
-        let cleanedText = responseText.trim();
-        if (cleanedText.startsWith("```json")) {
-          cleanedText = cleanedText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-        } else if (cleanedText.startsWith("```")) {
-          cleanedText = cleanedText.replace(/^```\s*/, "").replace(/\s*```$/, "");
-        }
-        
-        let parsed = JSON.parse(cleanedText.trim());
-        if (Array.isArray(parsed)) {
-          return { data: parsed, fromAI: true };
-        } else if (parsed && typeof parsed === 'object') {
-          if (Array.isArray(parsed.analysis)) return { data: parsed.analysis, fromAI: true };
-          if (Array.isArray(parsed.fallacies)) return { data: parsed.fallacies, fromAI: true };
-          if (Array.isArray(parsed.errors)) return { data: parsed.errors, fromAI: true };
-          if (Array.isArray(parsed.results)) return { data: parsed.results, fromAI: true };
-          
-          // Find any key in the object that is an array
-          for (const key of Object.keys(parsed)) {
-            if (Array.isArray(parsed[key])) {
-              return { data: parsed[key], fromAI: true };
-            }
-          }
-          // If single object returned representing one error
-          if (parsed.quote || parsed.errorName) {
-            return { data: [parsed], fromAI: true };
-          }
-        }
-        throw new Error("Response JSON structure could not be mapped to array");
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Gemini API] Attempt failed for model ${model}:`, err.message || err);
-        
-        if (attempt < maxRetriesPerModel) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-      }
-    }
-  }
-
-  // If online models fail or quota exhausted (429), fall back to rule-based logic engine for uninterrupted unlimited service
-  console.warn(`[Gemini API] Online API unavailable (${lastError?.message || lastError}). Seamlessly providing analysis via rule-based logic engine.`);
-  return { data: runOfflineAnalysis(originalText, fallbackLang), fromAI: false };
+  return aiClient;
 }
 
 async function startServer() {
@@ -180,54 +30,21 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Route to set global server Gemini API Key for all users
-  app.post("/api/set-server-key", (req, res) => {
-    try {
-      const { apiKey } = req.body;
-      if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
-        return res.status(400).json({ error: "Invalid API key provided" });
-      }
-      globalServerApiKey = apiKey.trim();
-      process.env.GEMINI_API_KEY = apiKey.trim();
-      fs.writeFileSync(SERVER_KEY_FILE, apiKey.trim(), "utf-8");
-      console.log("[Server Log] Successfully updated globalServerApiKey and persisted to server_key.txt");
-      return res.json({ success: true, message: "Global server API key updated successfully for all users!" });
-    } catch (err: any) {
-      console.error("[Server Log] Failed to update server key:", err);
-      return res.status(500).json({ error: err.message || "Failed to set server key" });
-    }
-  });
-
   // API Route for logical analysis
   app.post("/api/analyze", async (req, res) => {
     console.log("[Server Log] Hit /api/analyze with body:", req.body);
     try {
-      const { lang, customApiKey } = req.body;
-      let { text } = req.body;
-      
-      text = sanitizeInput(text);
+      const { text, lang } = req.body;
       
       if (!text || typeof text !== 'string') {
-        return res.status(400).json({ error: "No text provided or text contained only invalid binary/base64 data" });
+        return res.status(400).json({ error: "No text provided" });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Server missing Gemini API Key. Please configure it in the UI." });
       }
 
       const isPersian = lang === 'fa';
-      const normalizedText = normalizeTextForCache(text);
-      const cacheKey = `${lang || 'fa'}_${normalizedText}`;
-
-      // 1. Check persistent cache for instant, 100% identical and free results
-      if (analysisCache[cacheKey]) {
-        console.log(`[Cache Log] Match found for key [${cacheKey}]! Instantly returning cached output.`);
-        return res.json({ analysis: analysisCache[cacheKey] });
-      }
-
-      const apiKeyToUse = globalServerApiKey || process.env.GEMINI_API_KEY;
-
-      if (!apiKeyToUse) {
-        console.warn("[Server Log] No Gemini API key present. Providing seamless analysis using rule-based logic engine.");
-        const fallbackResult = runOfflineAnalysis(text, isPersian ? 'fa' : 'en');
-        return res.json({ analysis: fallbackResult, isOffline: true });
-      }
 
       const prompt = `
 You are an exceptionally rigorous, academic-grade pure logic analyzer and logical fallacy expert ("منطق‌سنج").
@@ -267,16 +84,44 @@ Here is the user text to evaluate:
 "${text}"
       `;
 
-      // 2. Perform the analysis with rich fallback capability using provided key
-      const { data: analysisResult, fromAI } = await analyzeWithFallback(prompt, isPersian ? 'fa' : 'en', text, apiKeyToUse);
+      const models = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+      let apiResponse = null;
+      let lastError = null;
 
-      // 3. Store result in local cache ONLY if obtained from genuine AI model
-      if (fromAI) {
-        analysisCache[cacheKey] = analysisResult;
-        saveCache();
+      for (const model of models) {
+        try {
+          const response = await getAI().models.generateContent({
+            model: model,
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              temperature: 0.2, // Low temperature for high logical consistency
+              responseMimeType: "application/json",
+            }
+          });
+          if (response && response.text) {
+            apiResponse = response;
+            break;
+          }
+        } catch (e: any) {
+          lastError = `Model ${model} failed: ${e.message}`;
+          console.warn(lastError);
+        }
       }
 
-      res.json({ analysis: analysisResult, isOffline: !fromAI });
+      if (!apiResponse) {
+        throw new Error(`All models failed or returned empty results. Last error: ${lastError}`);
+      }
+
+      const resultText = apiResponse.text || "[]";
+      let parsed = [];
+      try {
+        parsed = JSON.parse(resultText);
+      } catch (e) {
+        // Fallback if parsing fails
+        parsed = [];
+      }
+
+      res.json({ analysis: parsed });
 
     } catch (error: any) {
       console.error("Analysis Error:", error);
