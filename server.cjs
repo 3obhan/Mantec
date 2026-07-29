@@ -24,10 +24,151 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server.ts
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
+var import_fs = __toESM(require("fs"), 1);
 var import_vite = require("vite");
 var import_genai = require("@google/genai");
 var import_dotenv = __toESM(require("dotenv"), 1);
+
+// src/offlineAnalyzer.ts
+var rules_fa = [
+  {
+    regex: /(همه|هیچکس|همیشه|هرگز|همه‌چیز|هیچ‌چیز|عموماً|اکثراً|به‌طور کلی)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u062A\u0639\u0645\u06CC\u0645 \u0634\u062A\u0627\u0628\u200C\u0632\u062F\u0647 (Hasty Generalization)",
+    explanation: "\u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u06A9\u0644\u0645\u0627\u062A \u0645\u0637\u0644\u0642 \u06CC\u0627 \u062A\u0639\u0645\u06CC\u0645\u200C\u0647\u0627\u06CC \u06A9\u0644\u06CC \u0628\u062F\u0648\u0646 \u0627\u0631\u0627\u0626\u0647 \u0646\u0645\u0648\u0646\u0647\u200C\u0647\u0627\u06CC \u0622\u0645\u0627\u0631\u06CC \u06A9\u0627\u0641\u06CC\u060C \u0645\u0639\u0645\u0648\u0644\u0627\u064B \u0645\u0646\u062C\u0631 \u0628\u0647 \u0646\u0627\u062F\u06CC\u062F\u0647 \u06AF\u0631\u0641\u062A\u0646 \u0627\u0633\u062A\u062B\u0646\u0627\u0647\u0627 \u0648 \u0645\u062E\u062F\u0648\u0634 \u0634\u062F\u0646 \u0627\u0633\u062A\u062F\u0644\u0627\u0644 \u0645\u06CC\u200C\u0634\u0648\u062F."
+  },
+  {
+    regex: /(معلوم است|بدیهی است|کاملا مشخص است|همانطور که می‌دانیم|شک ندارم که|پر واضح است)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u0645\u0635\u0627\u062F\u0631\u0647 \u0628\u0647 \u0645\u0637\u0644\u0648\u0628 (Begging the Question)",
+    explanation: "\u0627\u062F\u0639\u0627\u06CC \u0627\u06CC\u0646\u06A9\u0647 \u0645\u0648\u0636\u0648\u0639\u06CC \u0630\u0627\u062A\u0627\u064B \u0627\u062B\u0628\u0627\u062A\u200C\u0634\u062F\u0647 \u0648 \u0628\u062F\u06CC\u0647\u06CC \u0627\u0633\u062A\u060C \u0645\u0639\u0645\u0648\u0644\u0627\u064B \u062A\u0644\u0627\u0634\u06CC \u0628\u0631\u0627\u06CC \u0637\u0641\u0631\u0647 \u0631\u0641\u062A\u0646 \u0627\u0632 \u0627\u0631\u0627\u0626\u0647 \u0634\u0648\u0627\u0647\u062F \u0648\u0627\u0642\u0639\u06CC \u0648 \u0627\u0633\u062A\u062F\u0644\u0627\u0644 \u0645\u0633\u062A\u062F\u0644 \u0628\u0647 \u0634\u0645\u0627\u0631 \u0645\u06CC\u200C\u0622\u06CC\u062F."
+  },
+  {
+    regex: /(احمق|نادان|دروغگو|دیوانه|بی‌سواد|نفهم|خودت که|شخص شما|سابقه شما)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u062D\u0645\u0644\u0647 \u0634\u062E\u0635\u06CC / \u062A\u0648\u0633\u0644 \u0628\u0647 \u0634\u062E\u0635 (Ad Hominem)",
+    explanation: "\u062D\u0645\u0644\u0647 \u0628\u0647 \u0648\u06CC\u0698\u06AF\u06CC\u200C\u0647\u0627\u06CC \u0634\u062E\u0635\u06CC\u062A\u06CC\u060C \u0633\u0627\u0628\u0642\u0647\u060C \u06CC\u0627 \u0627\u0646\u06AF\u06CC\u0632\u0647 \u06AF\u0648\u06CC\u0646\u062F\u0647 \u0628\u0647 \u062C\u0627\u06CC \u0628\u0647 \u0686\u0627\u0644\u0634 \u06A9\u0634\u06CC\u062F\u0646 \u0645\u0646\u0637\u0642\u06CC \u0627\u0635\u0644 \u0627\u0633\u062A\u062F\u0644\u0627\u0644 \u0648 \u0634\u0648\u0627\u0647\u062F \u0627\u0631\u0627\u0626\u0647\u200C\u0634\u062F\u0647."
+  },
+  {
+    regex: /(یا ... یا|یا با ما یا|یا این راه یا|دوراهی)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u062F\u0648\u0631\u0627\u0647\u06CC \u06A9\u0627\u0630\u0628 (False Dilemma)",
+    explanation: "\u0645\u062D\u062F\u0648\u062F \u06A9\u0631\u062F\u0646 \u06AF\u0632\u06CC\u0646\u0647\u200C\u0647\u0627\u06CC \u0645\u0648\u062C\u0648\u062F \u0628\u0647 \u062F\u0648 \u062D\u0627\u0644\u062A \u0645\u062A\u0636\u0627\u062F \u0648 \u0627\u0641\u0631\u0627\u0637\u06CC \u062F\u0631 \u062D\u0627\u0644\u06CC \u06A9\u0647 \u06AF\u0632\u06CC\u0646\u0647\u200C\u0647\u0627 \u0648 \u0631\u0627\u0647\u200C\u062D\u0644\u200C\u0647\u0627\u06CC \u0645\u06CC\u0627\u0646\u0647 \u062F\u06CC\u06AF\u0631\u06CC \u0646\u06CC\u0632 \u0648\u062C\u0648\u062F \u062F\u0627\u0631\u0646\u062F."
+  },
+  {
+    regex: /(اکثریت مردم|همه دارند می‌گویند|همه موافقند|افکار عمومی|محبوبیت|بین مردم جا افتاده)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u062A\u0648\u0633\u0644 \u0628\u0647 \u0627\u06A9\u062B\u0631\u06CC\u062A (Appeal to Popularity / Bandwagon)",
+    explanation: "\u0627\u062F\u0639\u0627\u06CC \u0627\u06CC\u0646\u06A9\u0647 \u06CC\u06A9 \u0628\u0627\u0648\u0631 \u06CC\u0627 \u0639\u0645\u0644 \u0628\u0647 \u0627\u06CC\u0646 \u062F\u0644\u06CC\u0644 \u06A9\u0647 \u0637\u0631\u0641\u062F\u0627\u0631\u0627\u0646 \u06CC\u0627 \u067E\u06CC\u0631\u0648\u0627\u0646 \u0632\u06CC\u0627\u062F\u06CC \u062F\u0627\u0631\u062F\u060C \u0644\u0632\u0648\u0645\u0627\u064B \u062F\u0631\u0633\u062A\u060C \u0627\u062E\u0644\u0627\u0642\u06CC \u06CC\u0627 \u0645\u0646\u0637\u0642\u06CC \u0627\u0633\u062A."
+  },
+  {
+    regex: /(اگر این اتفاق بیفتد قطعا فاجعه می‌شود|شیب لغزنده|سقوط کل جامعه|نابودی کامل)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u0634\u06CC\u0628 \u0644\u063A\u0632\u0646\u062F\u0647 (Slippery Slope)",
+    explanation: "\u0627\u062F\u0639\u0627\u06CC \u0627\u062B\u0628\u0627\u062A\u200C\u0646\u0634\u062F\u0647 \u0645\u0628\u0646\u06CC \u0628\u0631 \u0627\u06CC\u0646\u06A9\u0647 \u0627\u0646\u062C\u0627\u0645 \u06CC\u06A9 \u0627\u0642\u062F\u0627\u0645 \u06A9\u0648\u0686\u06A9 \u0644\u0632\u0648\u0645\u0627\u064B \u0645\u0646\u062C\u0631 \u0628\u0647 \u0632\u0646\u062C\u06CC\u0631\u0647\u200C\u0627\u06CC \u0627\u0632 \u062D\u0648\u0627\u062F\u062B \u0648\u062D\u0634\u062A\u0646\u0627\u06A9 \u0648 \u063A\u06CC\u0631\u0642\u0627\u0628\u0644\u200C\u06A9\u0646\u062A\u0631\u0644 \u062E\u0648\u0627\u0647\u062F \u0634\u062F."
+  },
+  {
+    regex: /(یک دانشمندی می‌گفت|شنیده‌ام که|می‌گویند که|به نقل از منابع غیررسمی|یک کارشناسی گفته)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u062A\u0648\u0633\u0644 \u0628\u0647 \u0645\u0631\u062C\u0639 \u06A9\u0627\u0630\u0628 (Appeal to False Authority)",
+    explanation: "\u0627\u0633\u062A\u0646\u0627\u062F \u0628\u0647 \u0645\u0631\u0627\u062C\u0639 \u0645\u0628\u0647\u0645\u060C \u0646\u0627\u0645\u0634\u062E\u0635 \u06CC\u0627 \u0641\u0627\u0642\u062F \u062A\u062E\u0635\u0635 \u0645\u0631\u062A\u0628\u0637 \u062F\u0631 \u062D\u0648\u0632\u0647 \u0645\u0648\u0631\u062F \u0628\u062D\u062B \u0628\u0631\u0627\u06CC \u0627\u062B\u0628\u0627\u062A \u0635\u062D\u062A \u06CC\u06A9 \u0627\u062F\u0639\u0627."
+  },
+  {
+    regex: /(دلتان نمی‌سوزد|بی‌رحمی|احساسات|عواطف|ترحم|ترس از اینکه)/g,
+    errorName: "\u0645\u063A\u0627\u0644\u0637\u0647 \u062A\u0648\u0633\u0644 \u0628\u0647 \u0627\u062D\u0633\u0627\u0633\u0627\u062A (Appeal to Emotion)",
+    explanation: "\u0628\u0647\u0631\u0647\u200C\u06AF\u06CC\u0631\u06CC \u0627\u0632 \u062E\u0634\u0645\u060C \u062A\u0631\u0633\u060C \u062F\u0644\u0633\u0648\u0632\u06CC \u06CC\u0627 \u0633\u0627\u06CC\u0631 \u0639\u0648\u0627\u0637\u0641 \u0645\u062E\u0627\u0637\u0628 \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u0627\u0628\u0632\u0627\u0631 \u0645\u062A\u0642\u0627\u0639\u062F\u0633\u0627\u0632\u06CC \u0628\u0647 \u062C\u0627\u06CC \u0627\u0631\u0627\u0626\u0647 \u0628\u0631\u0627\u0647\u06CC\u0646 \u0639\u0642\u0644\u0627\u0646\u06CC."
+  }
+];
+var rules_en = [
+  {
+    regex: /\b(always|never|everyone|nobody|all|none|generally|typically)\b/gi,
+    errorName: "Hasty Generalization / Absolute Statement",
+    explanation: "Using absolute words usually indicates a hasty generalization that ignores nuances, statistics, or counter-examples."
+  },
+  {
+    regex: /\b(obviously|clearly|as we all know|it is undeniable|plainly|without doubt)\b/gi,
+    errorName: "Begging the Question / Circular Logic",
+    explanation: "Assuming the premise is true without providing evidence, often used to bypass logical reasoning."
+  },
+  {
+    regex: /\b(stupid|idiot|liar|crazy|uneducated|ignorant|fool|your past|you yourself)\b/gi,
+    errorName: "Ad Hominem",
+    explanation: "Attacking the character, motive, or background of a person rather than addressing the substance of their argument."
+  },
+  {
+    regex: /\b(either ... or|only two choices|with us or against|dilemma)\b/gi,
+    errorName: "False Dilemma / False Dichotomy",
+    explanation: "Presenting only two extreme alternatives when in fact more realistic options or compromise solutions exist."
+  },
+  {
+    regex: /\b(majority|everyone agrees|public opinion|popular belief|society says)\b/gi,
+    errorName: "Appeal to Popularity (Bandwagon)",
+    explanation: "Asserting that a claim is true or good simply because a majority of people believe or do it."
+  },
+  {
+    regex: /\b(leads to disaster|slippery slope|complete ruin|downfall of)\b/gi,
+    errorName: "Slippery Slope Fallacy",
+    explanation: "Claiming without sufficient evidence that a small initial step will inevitably lead to a chain of catastrophic events."
+  },
+  {
+    regex: /\b(some scientist|heard that|they say|unnamed source|expert says)\b/gi,
+    errorName: "Appeal to False Authority",
+    explanation: "Citing an irrelevant, vague, or unqualified source or authority to back up an argument."
+  },
+  {
+    regex: /\b(pity|feel bad|fear of|cruelty|emotions|feelings|scared)\b/gi,
+    errorName: "Appeal to Emotion",
+    explanation: "Using emotional language, pity, fear, or anger to win an argument in the absence of solid rational proof."
+  }
+];
+function runOfflineAnalysis(text, lang) {
+  const fallacies = [];
+  const rules = lang === "fa" ? rules_fa : rules_en;
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  sentences.forEach((sentence) => {
+    let handled = false;
+    rules.forEach((rule) => {
+      if (!handled && rule.regex.test(sentence)) {
+        fallacies.push({
+          quote: sentence.trim(),
+          errorName: rule.errorName,
+          explanation: rule.explanation
+        });
+        handled = true;
+      }
+    });
+  });
+  return fallacies;
+}
+
+// server.ts
 import_dotenv.default.config();
+var CACHE_FILE = import_path.default.join(process.cwd(), "analysis_cache.json");
+var analysisCache = {};
+try {
+  if (import_fs.default.existsSync(CACHE_FILE)) {
+    analysisCache = JSON.parse(import_fs.default.readFileSync(CACHE_FILE, "utf-8"));
+    console.log(`[Cache] Loaded ${Object.keys(analysisCache).length} cached analyses.`);
+  }
+} catch (err) {
+  console.error("[Cache] Failed to load cache file:", err);
+}
+function saveCache() {
+  try {
+    import_fs.default.writeFileSync(CACHE_FILE, JSON.stringify(analysisCache, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Cache] Failed to save cache file:", err);
+  }
+}
+function normalizeTextForCache(text) {
+  if (!text) return "";
+  let norm = text.trim().toLowerCase();
+  norm = norm.replace(/[\s\r\n\t]+/g, " ");
+  norm = norm.replace(/ي/g, "\u06CC");
+  norm = norm.replace(/ك/g, "\u06A9");
+  norm = norm.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()؟?؛،]/g, "");
+  norm = norm.replace(/\s+/g, " ");
+  return norm.trim();
+}
+function sanitizeInput(text) {
+  if (!text) return "";
+  let cleaned = text.replace(/data:[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+;base64,[a-zA-Z0-9+/=]+/gi, "[Base64/Binary Data Removed]");
+  cleaned = cleaned.replace(/\b[a-zA-Z0-9+/]{40,}=*\b/g, "[Base64/Binary Data Removed]");
+  return cleaned.trim();
+}
 var aiClient = null;
 function getAI() {
   if (!aiClient) {
@@ -35,9 +176,64 @@ function getAI() {
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY environment variable is required");
     }
-    aiClient = new import_genai.GoogleGenAI({ apiKey });
+    aiClient = new import_genai.GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build"
+        }
+      }
+    });
   }
   return aiClient;
+}
+async function callGemini(modelName, prompt) {
+  const ai = getAI();
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      temperature: 0,
+      // Set to 0.0 for absolute logical consistency and determinism
+      seed: 42,
+      // Stable seed to guarantee identical outputs for constant inputs
+      responseMimeType: "application/json"
+    }
+  });
+  if (!response || !response.text) {
+    throw new Error("Empty response received from Gemini API");
+  }
+  return response.text;
+}
+async function analyzeWithFallback(prompt, fallbackLang, originalText) {
+  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+  const maxRetriesPerModel = 2;
+  let lastError = null;
+  for (const model of modelsToTry) {
+    for (let attempt = 1; attempt <= maxRetriesPerModel; attempt++) {
+      try {
+        console.log(`[Gemini API] Querying ${model} (attempt ${attempt}/${maxRetriesPerModel})...`);
+        const responseText = await callGemini(model, prompt);
+        let parsed = JSON.parse(responseText.trim());
+        if (Array.isArray(parsed)) {
+          return parsed;
+        } else if (parsed && typeof parsed === "object") {
+          if (Array.isArray(parsed.analysis)) return parsed.analysis;
+          if (Array.isArray(parsed.fallacies)) return parsed.fallacies;
+        }
+        throw new Error("Response JSON structure is not an array");
+      } catch (err) {
+        lastError = err;
+        console.warn(`[Gemini API] Attempt failed for model ${model}:`, err.message || err);
+        if (attempt < maxRetriesPerModel) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+      }
+    }
+  }
+  const isFa = fallbackLang === "fa";
+  const displayError = isFa ? `\u062E\u0637\u0627\u06CC \u0633\u06CC\u0633\u062A\u0645 \u0647\u0648\u0634 \u0645\u0635\u0646\u0648\u0639\u06CC: \u062A\u0645\u0627\u0645\u06CC \u0645\u062F\u0644\u200C\u0647\u0627\u06CC \u0622\u0646\u0644\u0627\u06CC\u0646 \u062F\u0631 \u062D\u0627\u0644 \u062D\u0627\u0636\u0631 \u0628\u0627 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0633\u0647\u0645\u06CC\u0647 \u06CC\u0627 \u062A\u0631\u0627\u0641\u06CC\u06A9 \u0633\u0646\u06AF\u06CC\u0646 \u0645\u0648\u0627\u062C\u0647 \u0647\u0633\u062A\u0646\u062F. \u0644\u0637\u0641\u0627\u064B \u0645\u062C\u062F\u062F\u0627\u064B \u062A\u0644\u0627\u0634 \u06A9\u0646\u06CC\u062F. (\u062C\u0632\u0626\u06CC\u0627\u062A: ${lastError?.message || lastError})` : `AI System Error: All online models are currently under heavy load or quota limits. Please try again in a few moments. (Details: ${lastError?.message || lastError})`;
+  throw new Error(displayError);
 }
 async function startServer() {
   const app = (0, import_express.default)();
@@ -50,14 +246,24 @@ async function startServer() {
   app.post("/api/analyze", async (req, res) => {
     console.log("[Server Log] Hit /api/analyze with body:", req.body);
     try {
-      const { text, lang } = req.body;
+      const { lang } = req.body;
+      let { text } = req.body;
+      text = sanitizeInput(text);
       if (!text || typeof text !== "string") {
-        return res.status(400).json({ error: "No text provided" });
-      }
-      if (!process.env.GEMINI_API_KEY) {
-        return res.status(500).json({ error: "Server missing Gemini API Key. Please configure it in the UI." });
+        return res.status(400).json({ error: "No text provided or text contained only invalid binary/base64 data" });
       }
       const isPersian = lang === "fa";
+      const normalizedText = normalizeTextForCache(text);
+      const cacheKey = `${lang || "fa"}_${normalizedText}`;
+      if (analysisCache[cacheKey]) {
+        console.log(`[Cache Log] Match found for key [${cacheKey}]! Instantly returning cached output.`);
+        return res.json({ analysis: analysisCache[cacheKey] });
+      }
+      if (!process.env.GEMINI_API_KEY) {
+        console.warn("[Server Log] GEMINI_API_KEY is missing. Using offline analyzer directly.");
+        const offlineResult = runOfflineAnalysis(text, isPersian ? "fa" : "en");
+        return res.json({ analysis: offlineResult });
+      }
       const prompt = `
 You are an exceptionally rigorous, academic-grade pure logic analyzer and logical fallacy expert ("\u0645\u0646\u0637\u0642\u200C\u0633\u0646\u062C").
 Your mandate is to perform a dual-layered evaluation of the user's text on a deep level of "pure reason" (\u0639\u0642\u0644 \u0645\u062D\u0636) with absolute conceptual precision:
@@ -95,40 +301,10 @@ Each object must contain exactly:
 Here is the user text to evaluate:
 "${text}"
       `;
-      const models = ["gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-2.5-flash"];
-      let apiResponse = null;
-      let lastError = null;
-      for (const model of models) {
-        try {
-          const response = await getAI().models.generateContent({
-            model,
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            config: {
-              temperature: 0.2,
-              // Low temperature for high logical consistency
-              responseMimeType: "application/json"
-            }
-          });
-          if (response && response.text) {
-            apiResponse = response;
-            break;
-          }
-        } catch (e) {
-          lastError = `Model ${model} failed: ${e.message}`;
-          console.warn(lastError);
-        }
-      }
-      if (!apiResponse) {
-        throw new Error(`All models failed or returned empty results. Last error: ${lastError}`);
-      }
-      const resultText = apiResponse.text || "[]";
-      let parsed = [];
-      try {
-        parsed = JSON.parse(resultText);
-      } catch (e) {
-        parsed = [];
-      }
-      res.json({ analysis: parsed });
+      const analysisResult = await analyzeWithFallback(prompt, isPersian ? "fa" : "en", text);
+      analysisCache[cacheKey] = analysisResult;
+      saveCache();
+      res.json({ analysis: analysisResult });
     } catch (error) {
       console.error("Analysis Error:", error);
       res.status(500).json({ error: error.message || "An error occurred during analysis" });
