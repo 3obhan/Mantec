@@ -58,7 +58,7 @@ Here is the user text to evaluate:
 "${text}"
     `;
 
-    const model = 'gemini-3.5-flash';
+    const model = 'gemini-2.0-flash';
     let geminiResponse = null;
     let lastError = null;
 
