@@ -16,4 +16,4 @@ Logical Analyzer Tool | ابزار سنجش منطق
 برنامه به صورت رایگان به آدرس زیر در دسترس است:
 
 
-https://mantec.sobhan-ganji.workers.dev
+https://mantech.pages.dev
