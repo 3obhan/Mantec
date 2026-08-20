@@ -18,5 +18,6 @@ Logical Analyzer Tool | ابزار سنجش منطق
 
 https://mantec.ir
 
-در صورت داشتن حرفی حدیثی پیرامون منطک:
+در صورت داشتن حرفی حدیثی پیرامون منطک
+
 info@mantec.ir
