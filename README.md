@@ -17,7 +17,7 @@ Logical Analyzer Tool | ابزار سنجش منطق
 
 https://play.google.com/store/apps/details?id=com.mantec.android
 
-منطک (نسخهٔ تک) در آدرس زیر در دسترس است
+منطک نسخه‌ای هم دارد که با کلید ای‌پی‌آی خود کاربر کار می‌کند به نام منطچ و به آدرس زیر در دسترس است
 
 https://mantec.ir
 
