@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="[https://picturetolink.com/i/eHqF8YuHHT.jpg]" />
+<img width="1200" height="475" alt="GHBanner" src="https://picturetolink.com/i/eHqF8YuHHT.jpg" />
 </div>
 
 Mantec | منطک
