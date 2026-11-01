@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://picturetolink.com/i/eHqF8YuHHT.jpg" />
+<img width="2000" height="1272" alt="GHBanner" src="https://picturetolink.com/i/eHqF8YuHHT.jpg" />
 </div>
 
 Mantec | منطک
@@ -19,7 +19,7 @@ https://play.google.com/store/apps/details?id=com.mantec.android
 
 منطک نسخه‌ای هم دارد که با کلید ای‌پی‌آی خود کاربر کار می‌کند به نام منطچ و به آدرس زیر در دسترس است
 
-https://mantec.ir
+https://mantech.pages.dev
 
 در صورت داشتن حرفی حدیثی پیرامون منطک
 
