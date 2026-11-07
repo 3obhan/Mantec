@@ -18,6 +18,7 @@ Logical Analyzer Tool | ابزار سنجش منطق
 https://play.google.com/store/apps/details?id=com.mantec.android
 
 اپلیکیشن منطک در کافه‌بازار:
+
 https://cafebazaar.ir/app/com.mantec.android
 
 
