@@ -1,17 +1,8 @@
-name = "mantec-payments"
-main = "worker/index.js"
+name = "mantec-pages"
+pages_build_output_dir = "./dist"
 compatibility_date = "2026-11-13"
-
-[assets]
-directory = "./dist"
-binding = "ASSETS"
-run_worker_first = ["/api/*"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "mantec-payments"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
-
-[vars]
-APP_ORIGIN = "https://mantec.sobhan-ganji.workers.dev"
-# Set PDF_PRICE_TOMAN as a secret/variable in Cloudflare. Zibal amount is sent in Rials (Toman x 10).
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
