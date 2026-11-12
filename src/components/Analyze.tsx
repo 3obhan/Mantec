@@ -238,15 +238,25 @@ export const Analyze = () => {
     if (!orderId || !['success', 'return'].includes(paymentState || '')) return;
     let cancelled = false;
     const verify = async () => {
-      for (let attempt = 0; attempt < 12 && !cancelled; attempt++) {
+      const token = sessionStorage.getItem(`mantec_pdf_token_${orderId}`);
+      if (!token) {
+        setPaymentMessage(isFa ? 'کلید دسترسی گزارش در این مرورگر پیدا نشد. خرید را از همین دستگاه انجام دهید.' : 'The report access token is missing in this browser. Please restart checkout on this device.');
+        return;
+      }
+      for (let attempt = 0; attempt < 24 && !cancelled; attempt++) {
         try {
-          const response = await fetch(`/api/payment/status?orderId=${encodeURIComponent(orderId)}`);
+          const response = await fetch(`/api/payment/status?orderId=${encodeURIComponent(orderId)}`, { cache: 'no-store' });
           const data = await response.json();
           if (data.status === 'paid') {
+            const reportResponse = await fetch(`/api/payment/report?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+            const reportData = await reportResponse.json();
+            if (!reportResponse.ok || !reportData.report) throw new Error(reportData.error || 'Could not retrieve the paid report');
+            setText(reportData.report.text);
+            setResult(reportData.report.fallacies);
             setHasPaidPdf(true);
             sessionStorage.removeItem('mantec_pending_pdf_text');
             sessionStorage.removeItem('mantec_pending_pdf_result');
-            setPaymentMessage(isFa ? 'پرداخت تأیید شد؛ اکنون می‌توانید PDF کامل را دریافت کنید.' : 'Payment confirmed. Your full PDF is ready.');
+            setPaymentMessage(isFa ? 'پرداخت تأیید شد؛ گزارش خریداری‌شده دریافت شد و PDF آماده است.' : 'Payment confirmed. Your purchased report is ready.');
             window.history.replaceState({}, '', window.location.pathname + '#/analyze');
             return;
           }
@@ -254,10 +264,12 @@ export const Analyze = () => {
             setPaymentMessage(isFa ? 'پرداخت تأیید نشد.' : 'Payment was not completed.');
             return;
           }
-        } catch (_) {}
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (err: any) {
+          if (err?.message && err.message !== 'Failed to fetch') setPaymentMessage(err.message);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
-      if (!cancelled) setPaymentMessage(isFa ? 'تأیید پرداخت هنوز در حال انجام است. چند لحظه دیگر دوباره بررسی کنید.' : 'Payment confirmation is still pending. Please check again shortly.');
+      if (!cancelled) setPaymentMessage(isFa ? 'تأیید پرداخت هنوز در حال انجام است. صفحه را نبندید و کمی بعد دوباره بررسی کنید.' : 'Payment confirmation is still pending. Keep this page open and check again shortly.');
     };
     verify();
     return () => { cancelled = true; };
@@ -346,14 +358,20 @@ export const Analyze = () => {
   };
 
   const handleBuyPDF = async (provider: 'zibal' | 'stripe') => {
+    if (!result || !text.trim()) return;
     setPaymentBusy(true);
     setPaymentMessage('');
     try {
+      const response = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, report: { text, fallacies: result, lang: lang === 'fa' ? 'fa' : 'en' } })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.checkoutUrl || !data.orderId || !data.accessToken) throw new Error(data.error || 'Could not start payment');
+      sessionStorage.setItem(`mantec_pdf_token_${data.orderId}`, data.accessToken);
       sessionStorage.setItem('mantec_pending_pdf_text', text);
       sessionStorage.setItem('mantec_pending_pdf_result', JSON.stringify(result));
-      const response = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) });
-      const data = await response.json();
-      if (!response.ok || !data.checkoutUrl) throw new Error(data.error || 'Could not start payment');
       window.location.assign(data.checkoutUrl);
     } catch (err: any) {
       setPaymentMessage(err.message || 'Payment could not be started.');
