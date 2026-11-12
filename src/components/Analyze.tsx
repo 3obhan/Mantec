@@ -19,6 +19,9 @@ export const Analyze = () => {
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isExporting, setIsExporting] = useState(false);
+  const [hasPaidPdf, setHasPaidPdf] = useState(false);
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState<string>('');
   const [stampSrc, setStampSrc] = useState<string>('');
   const [logoSrc, setLogoSrc] = useState<string>('');
 
@@ -222,6 +225,36 @@ export const Analyze = () => {
     preloadLogo();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('orderId');
+    const paymentState = params.get('payment');
+    if (!orderId || !['success', 'return'].includes(paymentState || '')) return;
+    let cancelled = false;
+    const verify = async () => {
+      for (let attempt = 0; attempt < 12 && !cancelled; attempt++) {
+        try {
+          const response = await fetch(`/api/payment/status?orderId=${encodeURIComponent(orderId)}`);
+          const data = await response.json();
+          if (data.status === 'paid') {
+            setHasPaidPdf(true);
+            setPaymentMessage(isFa ? 'پرداخت تأیید شد؛ اکنون می‌توانید PDF کامل را دریافت کنید.' : 'Payment confirmed. Your full PDF is ready.');
+            window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+            return;
+          }
+          if (data.status === 'failed') {
+            setPaymentMessage(isFa ? 'پرداخت تأیید نشد.' : 'Payment was not completed.');
+            return;
+          }
+        } catch (_) {}
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      if (!cancelled) setPaymentMessage(isFa ? 'تأیید پرداخت هنوز در حال انجام است. چند لحظه دیگر دوباره بررسی کنید.' : 'Payment confirmation is still pending. Please check again shortly.');
+    };
+    verify();
+    return () => { cancelled = true; };
+  }, [isFa]);
+
   const getSafeUUID = () => {
     return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
   };
@@ -304,7 +337,25 @@ export const Analyze = () => {
     }
   };
 
+  const handleBuyPDF = async (provider: 'zibal' | 'stripe') => {
+    setPaymentBusy(true);
+    setPaymentMessage('');
+    try {
+      const response = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) });
+      const data = await response.json();
+      if (!response.ok || !data.checkoutUrl) throw new Error(data.error || 'Could not start payment');
+      window.location.assign(data.checkoutUrl);
+    } catch (err: any) {
+      setPaymentMessage(err.message || 'Payment could not be started.');
+      setPaymentBusy(false);
+    }
+  };
+
   const handleExportPDF = async () => {
+    if (!hasPaidPdf) {
+      setPaymentMessage(isFa ? 'برای دریافت PDF کامل ابتدا خرید را انجام دهید.' : 'Please purchase the full PDF before downloading.');
+      return;
+    }
     if (!printRef.current) return;
     
     setIsExporting(true);
@@ -385,14 +436,19 @@ export const Analyze = () => {
         <div className="mt-12 sm:mt-16 bg-white border-4 border-[#1A1A1A] p-4 sm:p-10 shadow-[6px_6px_0px_0px_rgba(26,26,26,1)] sm:shadow-[8px_8px_0px_0px_rgba(26,26,26,1)] mb-12">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-10 gap-6">
             <h3 className="text-3xl font-black uppercase tracking-tight">Analysis Output</h3>
-            <button 
-              onClick={handleExportPDF}
-              className="flex items-center justify-center gap-3 px-8 py-3 bg-[#1A1A1A] text-white border-4 border-[#1A1A1A] font-black uppercase tracking-wider hover:bg-white hover:text-[#1A1A1A] transition-colors shadow-[4px_4px_0px_0px_#FF3B30] hover:shadow-none hover:translate-x-1 hover:translate-y-1 focus:outline-none"
-            >
-              <Download size={24} strokeWidth={3} /> {t.exportPdf}
-            </button>
+            {hasPaidPdf ? (
+              <button onClick={handleExportPDF} disabled={isExporting} className="flex items-center justify-center gap-3 px-8 py-3 bg-[#1A1A1A] text-white border-4 border-[#1A1A1A] font-black uppercase tracking-wider hover:bg-white hover:text-[#1A1A1A] disabled:opacity-50">
+                <Download size={24} strokeWidth={3} /> {isExporting ? (isFa ? 'در حال ساخت...' : 'Preparing...') : t.exportPdf}
+              </button>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button onClick={() => handleBuyPDF('zibal')} disabled={paymentBusy} className="px-5 py-3 bg-[#1A1A1A] text-white border-4 border-[#1A1A1A] font-black disabled:opacity-50">{paymentBusy ? '...' : (isFa ? 'خرید با زیبال' : 'Pay with Zibal')}</button>
+                <button onClick={() => handleBuyPDF('stripe')} disabled={paymentBusy} className="px-5 py-3 bg-white text-[#1A1A1A] border-4 border-[#1A1A1A] font-black disabled:opacity-50">{paymentBusy ? '...' : 'Pay with Stripe'}</button>
+              </div>
+            )}
           </div>
           
+          {paymentMessage && <p role="status" className="mb-4 p-3 border-2 border-[#1A1A1A] font-bold">{paymentMessage}</p>}
           <div className="overflow-auto border-4 border-[#1A1A1A] relative max-h-[600px] bg-[#F4F4F2]" dir={isFa ? 'rtl' : 'ltr'}>
              {/* Rendered directly at actual width and scaled cleanly for preview */}
              <div className="w-[840px] overflow-hidden p-4">
