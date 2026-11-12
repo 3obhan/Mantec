@@ -56,8 +56,8 @@ async function createPayment(request, env) {
   form.set("line_items[0][quantity]", "1");
   form.set("client_reference_id", orderId);
   form.set("metadata[orderId]", orderId);
-  form.set("success_url", new URL("/?payment=success&orderId=" + orderId, origin).toString());
-  form.set("cancel_url", new URL("/?payment=cancelled&orderId=" + orderId, origin).toString());
+  form.set("success_url", new URL("/#/analyze?payment=success&orderId=" + orderId, origin).toString());
+  form.set("cancel_url", new URL("/#/analyze?payment=cancelled&orderId=" + orderId, origin).toString());
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: { authorization: "Bearer " + env.STRIPE_SECRET_KEY, "content-type": "application/x-www-form-urlencoded" },
@@ -97,7 +97,7 @@ async function zibalCallback(url, env) {
       await env.DB.prepare("UPDATE payments SET status = 'failed' WHERE id = ? AND status = 'pending'").bind(orderId).run();
     }
   }
-  return Response.redirect(new URL("/?payment=return&orderId=" + encodeURIComponent(orderId), env.APP_ORIGIN).toString(), 303);
+  return Response.redirect(new URL("/#/analyze?payment=return&orderId=" + encodeURIComponent(orderId), env.APP_ORIGIN).toString(), 303);
 }
 
 async function stripeWebhook(request, env) {
