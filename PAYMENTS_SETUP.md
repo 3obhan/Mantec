@@ -43,9 +43,11 @@ Copy the merchant code from Zibal and save it as `ZIBAL_MERCHANT`. Set `PDF_PRIC
 
 1. Create a Cloudflare D1 database named `mantec-payments`.
 2. Copy its database ID into `wrangler.toml`, replacing `REPLACE_WITH_D1_DATABASE_ID`.
-3. Apply the schema to the remote database:
+3. For a **new/empty** database, apply the schema:
    `wrangler d1 execute mantec-payments --remote --file=./worker/schema.sql`
-4. Keep the D1 binding name exactly `DB`.
+4. If the database already has the previous payments table, apply the migration:
+   `wrangler d1 execute mantec-payments --remote --file=./worker/migrations/0002_paid_report_access.sql`
+5. Keep the D1 binding name exactly `DB`.
 
 The schema stores the report until the payment entitlement is needed. Add a retention/cleanup policy before treating this as a long-term report archive.
 
