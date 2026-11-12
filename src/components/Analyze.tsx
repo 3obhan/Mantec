@@ -226,9 +226,15 @@ export const Analyze = () => {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?').slice(1).join('?') : '';
+    const params = new URLSearchParams(hashQuery || window.location.search);
     const orderId = params.get('orderId');
     const paymentState = params.get('payment');
+    if (paymentState === 'cancelled') {
+      setPaymentMessage(isFa ? 'پرداخت لغو شد؛ گزارش شما حفظ شده است.' : 'Payment was cancelled. Your report is still available.');
+      window.history.replaceState({}, '', window.location.pathname + '#/analyze');
+      return;
+    }
     if (!orderId || !['success', 'return'].includes(paymentState || '')) return;
     let cancelled = false;
     const verify = async () => {
@@ -241,7 +247,7 @@ export const Analyze = () => {
             sessionStorage.removeItem('mantec_pending_pdf_text');
             sessionStorage.removeItem('mantec_pending_pdf_result');
             setPaymentMessage(isFa ? 'پرداخت تأیید شد؛ اکنون می‌توانید PDF کامل را دریافت کنید.' : 'Payment confirmed. Your full PDF is ready.');
-            window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+            window.history.replaceState({}, '', window.location.pathname + '#/analyze');
             return;
           }
           if (data.status === 'failed') {
