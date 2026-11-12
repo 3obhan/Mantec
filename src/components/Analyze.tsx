@@ -13,9 +13,9 @@ export const Analyze = () => {
   const t = translations[lang!];
   const isFa = lang === 'fa';
   
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => { try { return sessionStorage.getItem('mantec_pending_pdf_text') || ''; } catch { return ''; } });
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Fallacy[] | null>(null);
+  const [result, setResult] = useState<Fallacy[] | null>(() => { try { const saved = sessionStorage.getItem('mantec_pending_pdf_result'); return saved ? JSON.parse(saved) : null; } catch { return null; } });
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isExporting, setIsExporting] = useState(false);
@@ -238,6 +238,8 @@ export const Analyze = () => {
           const data = await response.json();
           if (data.status === 'paid') {
             setHasPaidPdf(true);
+            sessionStorage.removeItem('mantec_pending_pdf_text');
+            sessionStorage.removeItem('mantec_pending_pdf_result');
             setPaymentMessage(isFa ? 'پرداخت تأیید شد؛ اکنون می‌توانید PDF کامل را دریافت کنید.' : 'Payment confirmed. Your full PDF is ready.');
             window.history.replaceState({}, '', window.location.pathname + window.location.hash);
             return;
@@ -341,6 +343,8 @@ export const Analyze = () => {
     setPaymentBusy(true);
     setPaymentMessage('');
     try {
+      sessionStorage.setItem('mantec_pending_pdf_text', text);
+      sessionStorage.setItem('mantec_pending_pdf_result', JSON.stringify(result));
       const response = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) });
       const data = await response.json();
       if (!response.ok || !data.checkoutUrl) throw new Error(data.error || 'Could not start payment');
