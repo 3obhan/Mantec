@@ -1,77 +1,66 @@
-# Mantec — paid PDF setup (Zibal + Stripe)
+# Mantec — Cloudflare Pages payments (Zibal + Stripe)
 
-The payment Worker is in `worker/index.js`. It is a separate entry point; it does not alter or deploy your live Worker by itself.
+The payment API is implemented as **Cloudflare Pages Functions** in `functions/api/payment/`. It does not use or deploy a standalone Worker. Keep the existing production Worker untouched.
 
-## 1. Where to enter API keys (Cloudflare dashboard)
+## 1. Where to enter API keys
 
-Open **Cloudflare Dashboard → Workers & Pages → select the Worker that will run this code → Settings → Variables and Secrets → Add**.
+Open **Cloudflare Dashboard → Workers & Pages → Pages → your Mantec Pages project → Settings → Environment variables**.
 
-Add these as **Secret** values (never commit them to GitHub and never put them in frontend `VITE_*` variables):
+Add these under **Production** (and Preview too if you test Preview deployments). Use the encrypted/secret option for credentials:
 
-| Name | Type | Where to get it |
+| Variable | Type | Value |
 |---|---|---|
 | `ZIBAL_MERCHANT` | Secret | Merchant code from your Zibal panel |
-| `STRIPE_SECRET_KEY` | Secret | Stripe Dashboard → Developers → API keys → Secret key |
-| `STRIPE_WEBHOOK_SECRET` | Secret | Stripe Dashboard → Developers → Webhooks → your endpoint → Signing secret |
+| `STRIPE_SECRET_KEY` | Secret | Stripe secret key (`sk_test_...` for testing, `sk_live_...` for live) |
+| `STRIPE_WEBHOOK_SECRET` | Secret | Stripe webhook signing secret (`whsec_...`) |
+| `PDF_PRICE_TOMAN` | Plain variable | PDF price in toman, digits only; minimum 1,000 |
 
-For each one: choose **Secret**, enter the exact name above, paste its value, then Save. If you use separate test/live credentials, use matching Stripe test/live mode for both the secret key and webhook signing secret.
+Save the variables and redeploy Pages. Do not put keys in React code, `VITE_*` variables, GitHub, or committed files.
 
-### Non-secret settings (Variables)
+**Where to get them:** Zibal merchant code comes from your Zibal panel. Stripe API key is in Stripe Dashboard → Developers → API keys. The webhook signing secret is in Stripe Dashboard → Developers → Webhooks → your endpoint.
 
-In the same **Settings → Variables and Secrets** section, add:
+## 2. D1 binding
 
-| Name | Type | Example / meaning |
-|---|---|---|
-| `PDF_PRICE_TOMAN` | Variable | Your chosen price in toman (digits only; minimum 1,000) |
-| `APP_ORIGIN` | Variable | `https://mantec.sobhan-ganji.workers.dev` |
+1. Create a D1 database named `mantec-payments`.
+2. Open Pages project → **Settings → Functions → D1 database bindings**.
+3. Add a binding with variable name exactly `DB` and select that database.
+4. Apply `functions/schema.sql` using Wrangler:
+   `npx wrangler d1 execute mantec-payments --remote --file=./functions/schema.sql`
+5. Redeploy Pages after adding the binding.
 
-Do not paste the actual secret values into this file, source code, GitHub Issues, or chat.
+The included `wrangler.toml` is Cloudflare Pages configuration with output directory `dist` and a D1 binding. It has no Worker entry point. Replace the placeholder database ID if using Wrangler configuration.
 
-## 2. Stripe setup
+## 3. Stripe webhook
 
-1. In Stripe, create/enable a webhook endpoint:
-   `https://mantec.sobhan-ganji.workers.dev/api/payment/stripe-webhook`
-2. Subscribe to **`checkout.session.completed`**.
-3. Copy the endpoint's **Signing secret** (starts with `whsec_`) into Cloudflare as `STRIPE_WEBHOOK_SECRET`.
-4. The Worker creates a one-time **USD 1.00** Checkout Session directly; no Stripe Price ID is required.
+Create a Stripe webhook endpoint pointing to your **Cloudflare Pages domain**:
 
-## 3. Zibal setup
+`https://YOUR-PAGES-DOMAIN/api/payment/stripe-webhook`
 
-Copy the merchant code from Zibal and save it as `ZIBAL_MERCHANT`. Set `PDF_PRICE_TOMAN` to the amount customers in Iran should pay, in toman. The Worker converts toman to rial for Zibal's API.
+Subscribe to `checkout.session.completed`. Copy its Signing secret into the Pages secret `STRIPE_WEBHOOK_SECRET`. Stripe Checkout charges **USD 1.00** per report. No Stripe Price ID is required.
 
-## 4. D1 database
+Use test API and webhook secrets together during testing; use live secrets together for live payments.
 
-1. Create a Cloudflare D1 database named `mantec-payments`.
-2. Copy its database ID into `wrangler.toml`, replacing `REPLACE_WITH_D1_DATABASE_ID`.
-3. For a **new/empty** database, apply the schema:
-   `wrangler d1 execute mantec-payments --remote --file=./worker/schema.sql`
-4. If the database already has the previous payments table, apply the migration:
-   `wrangler d1 execute mantec-payments --remote --file=./worker/migrations/0002_paid_report_access.sql`
-5. Keep the D1 binding name exactly `DB`.
+## 4. Local development
 
-The schema stores the report until the payment entitlement is needed. Add a retention/cleanup policy before treating this as a long-term report archive.
-
-## 5. Local development
-
-Create a local-only file named `.dev.vars` in the repository root (do not commit it):
+Create an uncommitted `.dev.vars` file in the repository root:
 
 ```dotenv
 ZIBAL_MERCHANT=your_zibal_merchant_code
 STRIPE_SECRET_KEY=sk_test_replace_me
 STRIPE_WEBHOOK_SECRET=whsec_replace_me
 PDF_PRICE_TOMAN=your_price_in_toman
-APP_ORIGIN=http://localhost:8787
 ```
 
-Keep `.dev.vars` out of Git. If the repository does not already ignore it, add it to `.gitignore`.
+The file is ignored by Git. Use Wrangler Pages dev after building the site to test Pages Functions locally.
 
-## 6. Payment and report access
+## 5. Payment flow
 
-- `POST /api/payment/create` accepts `{provider, report:{text, fallacies, lang}}`.
-- The Worker creates a random 256-bit report token and stores only its SHA-256 hash in D1.
-- `GET /api/payment/status?orderId=...` reports the payment state; it does not grant access to the report.
-- `GET /api/payment/report?orderId=...&token=...` returns report content only after the server confirms payment and validates the token.
-- Zibal is verified server-to-server on callback. Stripe is marked paid only by a valid webhook signature and the expected USD 1.00 amount.
-- PDF rendering remains in the existing browser renderer, but the report payload is delivered to the browser only after the paid check.
+- `POST /api/payment/create` saves the report in D1, creates a random access token, and starts checkout.
+- Only the SHA-256 token hash is stored in D1.
+- `GET /api/payment/status?orderId=...` returns status only.
+- `GET /api/payment/report?orderId=...&token=...` releases the report only after confirmed payment and token validation.
+- Zibal is verified server-to-server by the Pages callback.
+- Stripe is verified by webhook signature and the expected USD 1.00 amount.
+- The browser creates the PDF only after the protected report endpoint releases the purchased report.
 
-Never use a public order ID alone as authorization. Never expose payment keys in browser code.
+Add a retention policy before using D1 as a permanent report archive.
