@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS payments (
   currency TEXT NOT NULL,
   provider_ref TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
-  paid_at TEXT
+  paid_at TEXT,
+  report_json TEXT NOT NULL,
+  access_token_hash TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS payments_status_created ON payments(status, created_at);
