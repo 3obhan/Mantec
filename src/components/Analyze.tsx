@@ -9,7 +9,7 @@ import jsPDF from 'jspdf';
 import domtoimage from 'dom-to-image-more';
 
 export const Analyze = () => {
-  const { lang, addHistory } = useAppState();
+  const { lang, history, addHistory } = useAppState();
   const t = translations[lang!];
   const isFa = lang === 'fa';
   
@@ -20,6 +20,7 @@ export const Analyze = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isExporting, setIsExporting] = useState(false);
   const [hasPaidPdf, setHasPaidPdf] = useState(false);
+  const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState<string>('');
   const [stampSrc, setStampSrc] = useState<string>('');
@@ -340,8 +341,10 @@ export const Analyze = () => {
       }
       
       setResult(analysisData);
+      const historyId = getSafeUUID();
+      setCurrentHistoryId(historyId);
       addHistory({
-        id: getSafeUUID(),
+        id: historyId,
         timestamp: new Date().toISOString(),
         text,
         fallacies: analysisData,
@@ -369,9 +372,8 @@ export const Analyze = () => {
       if (!response.ok || !data.checkoutUrl || !data.orderId || !data.accessToken) throw new Error(data.error || 'Could not start payment');
       sessionStorage.setItem(`mantec_pdf_token_${data.orderId}`, data.accessToken);
       localStorage.setItem(`mantec_pdf_token_${data.orderId}`, data.accessToken);
-      const reportDigest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-      const reportHash = Array.from(new Uint8Array(reportDigest)).map(b => b.toString(16).padStart(2, '0')).join('');
-      localStorage.setItem('mantec_pdf_order_' + reportHash, data.orderId);
+      const historyId = currentHistoryId || history.find(item => item.text === text)?.id;
+      if (historyId) localStorage.setItem('mantec_pdf_order_' + historyId, data.orderId);
       sessionStorage.setItem('mantec_pending_pdf_text', text);
       sessionStorage.setItem('mantec_pending_pdf_result', JSON.stringify(result));
       window.location.assign(data.checkoutUrl);
