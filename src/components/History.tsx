@@ -24,7 +24,11 @@ export const HistoryView = () => {
           const orderId = localStorage.getItem('mantec_pdf_order_' + hash);
           if (!orderId) continue;
           const token = localStorage.getItem('mantec_pdf_token_' + orderId);
-          if (token) found[item.id] = { orderId, token };
+          if (!token) continue;
+          const statusResponse = await fetch('/api/payment/status?orderId=' + encodeURIComponent(orderId), { cache: 'no-store' });
+          if (!statusResponse.ok) continue;
+          const statusData = await statusResponse.json();
+          if (statusData.status === 'paid') found[item.id] = { orderId, token };
         } catch (error) { console.warn('Could not check PDF purchase for history item', error); }
       }
       setPurchased(found);
