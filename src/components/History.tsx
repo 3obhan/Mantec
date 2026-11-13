@@ -19,9 +19,7 @@ export const HistoryView = () => {
       const found: Record<string, { orderId: string; token: string }> = {};
       for (const item of history) {
         try {
-          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(item.text));
-          const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-          const orderId = localStorage.getItem('mantec_pdf_order_' + hash);
+          const orderId = localStorage.getItem('mantec_pdf_order_' + item.id);
           if (!orderId) continue;
           const token = localStorage.getItem('mantec_pdf_token_' + orderId);
           if (!token) continue;
