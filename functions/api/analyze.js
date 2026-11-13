@@ -58,7 +58,7 @@ Here is the user text to evaluate:
 "${text}"
     `;
 
-    const modelsToTry = ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+    const modelsToTry = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash"];
     let geminiResponse = null;
     let lastError = null;
 
@@ -107,13 +107,13 @@ Here is the user text to evaluate:
     }
 
     const geminiData = await geminiResponse.json();
-    const resultText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    const resultText = geminiData.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("").trim() || "[]";
     
     let parsed = [];
     try {
       parsed = JSON.parse(resultText);
     } catch (e) {
-      parsed = [];
+      return new Response(JSON.stringify({ error: "Gemini returned invalid JSON: " + e.message }), { status: 502, headers: { "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ analysis: parsed }), {
