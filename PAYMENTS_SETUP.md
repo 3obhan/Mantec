@@ -1,4 +1,4 @@
-# Mantec — Cloudflare Pages payments (Zibal + Stripe)
+# Mantec — Cloudflare Pages with two payment types (Zibal + Stripe)
 
 The payment API is implemented as **Cloudflare Pages Functions** in `functions/api/payment/`. It does not use or deploy a standalone Worker. Keep the existing production Worker untouched.
 
