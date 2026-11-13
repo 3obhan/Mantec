@@ -5,4 +5,4 @@ compatibility_date = "2026-11-13"
 [[d1_databases]]
 binding = "DB"
 database_name = "mantec-payments"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "6090a19f-0243-465e-b261-423fc4640afb"
