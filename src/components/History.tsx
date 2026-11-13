@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import jsPDF from 'jspdf';
+import domtoimage from 'dom-to-image-more';
 import { useAppState } from '../store';
 import { translations } from '../i18n';
 import { Link } from 'react-router-dom';
@@ -9,6 +11,105 @@ export const HistoryView = () => {
   const t = translations[lang!];
   const isFa = lang === 'fa';
   const [showHandbook, setShowHandbook] = useState(false);
+  const [purchased, setPurchased] = useState<Record<string, { orderId: string; token: string }>>({});
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      const found: Record<string, { orderId: string; token: string }> = {};
+      for (const item of history) {
+        try {
+          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(item.text));
+          const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const orderId = localStorage.getItem('mantec_pdf_order_' + hash);
+          if (!orderId) continue;
+          const token = localStorage.getItem('mantec_pdf_token_' + orderId);
+          if (token) found[item.id] = { orderId, token };
+        } catch (error) { console.warn('Could not check PDF purchase for history item', error); }
+      }
+      setPurchased(found);
+    };
+    load();
+  }, [history]);
+
+  const downloadPdf = async (item: typeof history[number]) => {
+    const access = purchased[item.id];
+    if (!access) return;
+    setDownloading(item.id);
+    let paper: HTMLDivElement | null = null;
+    try {
+      const response = await fetch('/api/payment/report?orderId=' + encodeURIComponent(access.orderId) + '&token=' + encodeURIComponent(access.token), { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !data.report) throw new Error(data.error || 'Could not retrieve your purchased report');
+      const report = data.report;
+      paper = document.createElement('div');
+      paper.dir = report.lang === 'fa' ? 'rtl' : 'ltr';
+      paper.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;padding:48px;background:#fff;color:#172554;font-family:Vazirmatn,Arial,sans-serif;line-height:2;white-space:normal;box-sizing:border-box;';
+      const heading = document.createElement('h1');
+      heading.textContent = report.lang === 'fa' ? 'منطک | گزارش کامل تحلیل منطقی' : 'Mantec | Full Logical Analysis Report';
+      heading.style.cssText = 'text-align:center;font-size:30px;border-bottom:3px solid #1e3a8a;padding-bottom:20px;margin-bottom:28px;';
+      paper.appendChild(heading);
+      const inputTitle = document.createElement('h2');
+      inputTitle.textContent = report.lang === 'fa' ? 'متن ارسالی' : 'Submitted Text';
+      paper.appendChild(inputTitle);
+      const inputText = document.createElement('p');
+      inputText.textContent = report.text;
+      inputText.style.cssText = 'white-space:pre-wrap;font-size:18px;color:#1e40af;';
+      paper.appendChild(inputText);
+      const resultTitle = document.createElement('h2');
+      resultTitle.textContent = report.lang === 'fa' ? 'نتایج تحلیل' : 'Analysis Results';
+      resultTitle.style.cssText = 'margin-top:32px;border-top:2px solid #cbd5e1;padding-top:20px;';
+      paper.appendChild(resultTitle);
+      if (!report.fallacies?.length) {
+        const none = document.createElement('p');
+        none.textContent = report.lang === 'fa' ? 'مغالطه یا خطای منطقی مشخصی یافت نشد.' : 'No specific logical fallacies or errors were identified.';
+        paper.appendChild(none);
+      }
+      (report.fallacies || []).forEach((f: any, index: number) => {
+        const section = document.createElement('section');
+        section.style.cssText = 'border-bottom:1px solid #cbd5e1;padding:18px 0;break-inside:avoid;';
+        const name = document.createElement('h3');
+        name.textContent = (index + 1) + '. ' + (f.errorName || '');
+        name.style.color = '#b91c1c';
+        section.appendChild(name);
+        if (f.quote) { const quote = document.createElement('blockquote'); quote.textContent = f.quote; quote.style.cssText = 'margin:8px 0;padding:8px 14px;background:#eff6ff;border-right:4px solid #2563eb;'; section.appendChild(quote); }
+        const explanation = document.createElement('p');
+        explanation.textContent = f.explanation || '';
+        section.appendChild(explanation);
+        paper!.appendChild(section);
+      });
+      const footer = document.createElement('p');
+      footer.textContent = 'Mantec — Logical Analysis';
+      footer.style.cssText = 'text-align:center;color:#64748b;margin-top:36px;font-size:12px;';
+      paper.appendChild(footer);
+      document.body.appendChild(paper);
+      await document.fonts.ready;
+      const imageData = await domtoimage.toJpeg(paper, { quality: 1, bgcolor: '#ffffff', cacheBust: true });
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const image = new Image();
+      image.src = imageData;
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; });
+      const renderedHeight = image.height * pageWidth / image.width;
+      let remaining = renderedHeight;
+      let position = 0;
+      pdf.addImage(imageData, 'JPEG', 0, position, pageWidth, renderedHeight);
+      remaining -= pageHeight;
+      while (remaining > 0) {
+        position = remaining - renderedHeight;
+        pdf.addPage();
+        pdf.addImage(imageData, 'JPEG', 0, position, pageWidth, renderedHeight);
+        remaining -= pageHeight;
+      }
+      pdf.save('Mantec_Report_' + Date.now() + '.pdf');
+    } catch (error: any) {
+      alert(error?.message || 'Could not download the purchased PDF.');
+    } finally {
+      if (paper?.parentNode) paper.parentNode.removeChild(paper);
+      setDownloading(null);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 animate-fade-in w-full">
@@ -227,6 +328,15 @@ export const HistoryView = () => {
                 </ul>
               </div>
 
+              {purchased[item.id] && (
+                <button
+                  onClick={() => downloadPdf(item)}
+                  disabled={downloading === item.id}
+                  className={`absolute bottom-6 ${isFa ? 'right-6' : 'left-6'} px-4 py-2 bg-[#1A1A1A] text-white border-2 border-[#1A1A1A] font-black hover:bg-white hover:text-[#1A1A1A] disabled:opacity-50`}
+                >
+                  {downloading === item.id ? (isFa ? 'در حال آماده‌سازی...' : 'Preparing...') : (isFa ? 'دانلود PDF' : 'Download PDF')}
+                </button>
+              )}
               <button 
                 onClick={() => removeHistoryItem(item.id)}
                 className={`absolute top-6 ${isFa ? 'left-6' : 'right-6'} text-[#1A1A1A] hover:text-[#FF3B30] transition-colors`}
