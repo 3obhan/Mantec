@@ -335,10 +335,8 @@ export const Analyze = () => {
         const data = await response.json();
         analysisData = data.analysis;
       } catch (apiErr: any) {
-        console.warn("API request failed, falling back to local offline analysis:", apiErr);
-        // Fall back to offline analysis client-side!
-        analysisData = runOfflineAnalysis(text, lang as 'fa' | 'en');
-        setIsOffline(true);
+        console.error("Online analysis API failed:", apiErr);
+        throw new Error(apiErr?.message || (lang === 'fa' ? "ارتباط با سرویس تحلیل برقرار نشد." : "Could not reach the analysis service."));
       }
       
       setResult(analysisData);
