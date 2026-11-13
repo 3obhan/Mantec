@@ -368,6 +368,10 @@ export const Analyze = () => {
       const data = await response.json();
       if (!response.ok || !data.checkoutUrl || !data.orderId || !data.accessToken) throw new Error(data.error || 'Could not start payment');
       sessionStorage.setItem(`mantec_pdf_token_${data.orderId}`, data.accessToken);
+      localStorage.setItem(`mantec_pdf_token_${data.orderId}`, data.accessToken);
+      const reportDigest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      const reportHash = Array.from(new Uint8Array(reportDigest)).map(b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('mantec_pdf_order_' + reportHash, data.orderId);
       sessionStorage.setItem('mantec_pending_pdf_text', text);
       sessionStorage.setItem('mantec_pending_pdf_result', JSON.stringify(result));
       window.location.assign(data.checkoutUrl);
