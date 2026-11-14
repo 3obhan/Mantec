@@ -3,7 +3,7 @@
 export const config = { api: { bodyParser: { sizeLimit: "1mb" } } };
 
 function parseArray(raw) {
-  const cleaned = String(raw || "").trim().replace(/^```(?:json)?s*/i, "").replace(/s*```$/, "");
+  const cleaned = String(raw || "").trim().replace(/^```(?:json)?\\s*/i, "").replace(/\\s*```$/, "");
   const parsed = JSON.parse(cleaned);
   if (Array.isArray(parsed)) return parsed;
   if (parsed && Array.isArray(parsed.analysis)) return parsed.analysis;
@@ -40,10 +40,11 @@ async function callGemini(prompt, apiKey) {
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
         method: "POST",
+        signal: AbortSignal.timeout(12000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" }
+          generationConfig: { responseMimeType: "application/json", thinkingConfig: { thinkingLevel: "low" } }
         })
       });
       const data = await response.json().catch(() => ({}));
@@ -62,6 +63,7 @@ async function callGemini(prompt, apiKey) {
 async function callGroq(prompt, apiKey) {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(20000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`
