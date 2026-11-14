@@ -20,7 +20,7 @@ Evaluate the submitted text on two layers:
 2. Formal and informal fallacies, including strawman, ad hominem, circular reasoning, hasty generalization, false dilemma, appeal to popularity, false cause, slippery slope, appeal to emotion, false authority, equivocation, and poisoning the well.
 
 Be rigorous. Distinguish artistic metaphors from literal claims. Only flag genuine flaws in reasoning, concepts, or physical reality.
-Return ONLY a valid JSON array. If no errors are found, return [].
+Return ONLY a valid JSON object with one key named "analysis", whose value is an array of error objects. If no errors are found, return {"analysis": []}.
 Each object must contain exactly:
 - "quote": exact flawed segment from the text.
 - "errorName": name of the error in ${isFa ? "Persian" : "English"}.
@@ -34,7 +34,7 @@ ${text}
 }
 
 async function callGemini(prompt, apiKey) {
-  const models = ["gemini-flash-latest", "gemini-2.5-flash"];
+  const models = ["gemini-3.8-flash"];
   let lastError;
   for (const model of models) {
     try {
@@ -43,7 +43,7 @@ async function callGemini(prompt, apiKey) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+          generationConfig: { responseMimeType: "application/json" }
         })
       });
       const data = await response.json().catch(() => ({}));
