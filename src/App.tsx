@@ -45,7 +45,7 @@ const LayoutWrapper = ({ children, dir }: { children: React.ReactNode, dir: 'rtl
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold border-r border-[#1A1A1A] pr-4 uppercase tracking-wider">PDF Export Ready</span>
+          <span className="text-xs font-bold border-r border-[#1A1A1A] pr-4 uppercase tracking-wider">Sobhan Ganji</span>
           <img src="/signature.png" alt="" className="w-8 h-8 object-contain" />
         </div>
       </footer>
