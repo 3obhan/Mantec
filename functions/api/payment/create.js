@@ -15,7 +15,7 @@ export async function onRequestPost({ request, env }) {
   const accessToken = randomToken();
   const tokenHash = await sha256(accessToken);
   const reportJson = JSON.stringify({ text: report.text, fallacies: report.fallacies, lang: report.lang });
-  const origin = originOf(request);
+  const origin = "https://mantecapp.vercel.app";
   let providerRef, checkoutUrl, amount, currency;
 
   if (provider === "zibal") {
