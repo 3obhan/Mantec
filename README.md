@@ -9,7 +9,7 @@ English | فارسی
 Logical Analyzer Tool | ابزار سنجش منطق
 
 
-Mantec is your logical assistant for thinking critically, spotting fallacies, challenging assumptions and building stronger arguments - Remember betterment in almost anything stars with questioning almost everything |Sobhan Ganji
+Mantec is your logical assistant for thinking critically, spotting fallacies, challenging assumptions and building stronger arguments - Remember betterment in almost anything starts with questioning almost everything |Sobhan Ganji
 
 
 منطک که دستیار هوشمند شماست در خردورزی‌های ان‌شاء‌الله پیاپی پیش رو، بنا دارد اگر طبیعتی نکرده اشتباهی چیزی داشت متن فارسی یا انگلیسی شما بگوید به شما و بگوید چرا و کجا و چطورش را هم.
