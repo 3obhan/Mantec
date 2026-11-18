@@ -43,4 +43,4 @@ info@mantec.ir
 تمامی حقوق مادی و معنوی، حق انتشار و کپی‌رایت این برنامه متعلق است به سبحان گنجی
 
 
-This project is Proprietary Copyright (c) 2026 Sobhan Ganji
+This Project is Proprietary Copyright (c) 2026 Sobhan Ganji
