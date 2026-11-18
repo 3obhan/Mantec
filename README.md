@@ -40,4 +40,7 @@ https://mantech.pages.dev
 
 info@mantec.ir
 
-This project is Proprietary Copyright (c) 2026 Sobhan Ganji | تمامی حقوق مادی و معنوی، حق انتشار و کپی‌رایت این برنامه متعلق است به سبحان گنجی
+تمامی حقوق مادی و معنوی، حق انتشار و کپی‌رایت این برنامه متعلق است به سبحان گنجی
+
+
+This project is Proprietary Copyright (c) 2026 Sobhan Ganji
