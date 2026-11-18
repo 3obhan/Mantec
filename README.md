@@ -17,6 +17,12 @@ Mantec is your logical assistant for thinking critically, spotting fallacies, ch
 
 هدف پروژهٔ منطک، اهتمام به داشتن دنیایی‌ست عاقلانه‌تر، اخلاق‌مدارانه‌تر و بالتبع زیباتر... | سبحان گنجی
 
+
+آدرس وبسایت:
+
+https://mantecapp.vercel.ir
+
+
 اپلیکیشن اندرویدی منطک در گوگل‌پلی:
 
 https://play.google.com/store/apps/details?id=com.mantec.android
@@ -33,3 +39,5 @@ https://mantech.pages.dev
 در صورت داشتن حرفی حدیثی پیرامون منطک
 
 info@mantec.ir
+
+This project is Proprietary Copyright (c) 2026 Sobhan Ganji | تمامی حقوق مادی و معنوی، حق انتشار و کپی‌رایت این برنامه متعلق است به سبحان گنجی
