@@ -18,7 +18,7 @@ Mantec is your logical assistant for thinking critically, spotting fallacies, ch
 هدف پروژهٔ منطک، اهتمام به داشتن دنیایی‌ست عاقلانه‌تر، اخلاق‌مدارانه‌تر و بالتبع زیباتر... | سبحان گنجی
 
 
-آدرس وبسایت:
+آدرس وبسایت منطک:
 
 https://mantecapp.vercel.ir
 
