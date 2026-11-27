@@ -20,7 +20,7 @@ Mantec is your logical assistant for thinking critically, spotting fallacies, ch
 
 آدرس وبسایت منطک:
 
-https://mantecapp.vercel.ir
+https://mantecapp.vercel.app
 
 
 اپلیکیشن اندرویدی منطک در گوگل‌پلی:
